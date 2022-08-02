@@ -34,16 +34,14 @@ class Generalized_Dice_loss(nn.Module):
         loss = 0.
         n_classes = y_pred.shape[1]
         class_weights = np.asarray(class_weights, dtype=float)
-        for c in range(0, n_classes):  # pass 0 because 0 is background
+        for c in range(n_classes):  # pass 0 because 0 is background
             pred_flat = y_pred[:, c]
             true_flat = y_true[:, c]
             intersection = (pred_flat * true_flat).sum()
-
             # with weight
             w = class_weights[c] / class_weights.sum()
             loss += w * (1 - ((2. * intersection + smooth) /
                               (pred_flat.sum() + true_flat.sum() + smooth)))
-
         return loss
 
     # def cal_subject_level_dice(prediction, target, class_weights, class_num=2):  # class_num是你分割的目标的类别个数

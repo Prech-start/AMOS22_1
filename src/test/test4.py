@@ -12,7 +12,7 @@ test_loader = DataLoader(
 model = UnetModel(1, 16, 6)
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot2.pth')))
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot.pth')))
-model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3.pth')))
+model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_0.pth')))
 
 for i, j in test_loader:
     k = model(i.float())

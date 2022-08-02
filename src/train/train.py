@@ -77,7 +77,7 @@ def train(pre_train_model, batch_size, criterion, device):
     # 初始化 early_stopping 对象
     patience = 20  # 当验证集损失在连续20次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
     early_stopping = EarlyStopping(patience, verbose=True, path=os.path.join('..', 'checkpoints', 'auto_save',
-                                                                             'Generalized_Dice_loss_e-3.pth'))
+                                                                             'Generalized_Dice_loss_e-3_0.pth'))
     n_epochs = 1000  # 可以设置大一些，毕竟你是希望通过 early stopping 来结束模型训练
 
     # 建立训练数据的 DataLoader
@@ -164,6 +164,6 @@ def train(pre_train_model, batch_size, criterion, device):
 if __name__ == '__main__':
     class_num = 16
     model = UnetModel(1, class_num, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3.pth')))
-    model = train(model, 1, Generalized_Dice_loss([2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4]),
+    # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_0.pth')))
+    model = train(model, 1, Generalized_Dice_loss([1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4]),
                   torch.device('cuda'))
