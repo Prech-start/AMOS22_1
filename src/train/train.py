@@ -73,9 +73,9 @@ def train(pre_train_model, batch_size, criterion, device):
     model = pre_train_model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     # 初始化 early_stopping 对象
-    patience = 20  # 当验证集损失在连续20次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
+    patience = 10 # 当验证集损失在连续20次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
     early_stopping = EarlyStopping(patience, verbose=True, path=os.path.join('..', 'checkpoints', 'auto_save',
-                                                                             'Generalized_Dice_loss_e-3_0.pth'))
+                                                                             'Generalized_Dice_loss_e-3_1.pth'))
     n_epochs = 1000
 
     # 建立训练数据的 DataLoader
@@ -183,7 +183,7 @@ def show_result(model):
 if __name__ == '__main__':
     class_num = 16
     model = UnetModel(1, class_num, 6)
-    # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_0.pth')))
+    # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_1.pth')))
     # loss = Generalized_Dice_loss([1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4])
     loss = nn.BCELoss()
     # TODO: loss = nn.BCELoss()

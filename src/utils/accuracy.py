@@ -2,6 +2,8 @@ import os.path
 import copy
 import torch
 import numpy as np
+from torch.nn.functional import one_hot
+from torch.utils.data import DataLoader
 from scipy.optimize import linear_sum_assignment
 from hausdorff import hausdorff_distance
 from src.process.data_load import *
@@ -10,7 +12,6 @@ from einops import *
 import math
 from absl.testing import absltest
 from absl.testing import parameterized
-import numpy as np
 import surface_distance
 from surface_distance import metrics
 
@@ -162,26 +163,27 @@ def calculate_acc(output, target, class_num, fun):
 
     # acc.append(output, target)
     return acc
-
+from tqdm import tqdm
 
 if __name__ == '__main__':
-    whole_set = data_set()
-    lens = len(whole_set)
-    train_len = lens * 0.8
-    _, test_set = torch.utils.data.random_split(whole_set, [int(train_len), lens - int(train_len)],
-                                                torch.Generator().manual_seed(0))
-    model = Model(1, 16)
-    # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot.pth')))
-    # model = model.cpu()
-    data_loder = DataLoader(dataset=test_set, batch_size=1, num_workers=2, pin_memory=True, shuffle=False)
+    test_data = data_set(False)
+    data_loader = DataLoader(
+        dataset=test_data,
+        batch_size=1,
+        pin_memory=True,
+        shuffle=True
+    )
+    model = UnetModel(1, 16, 6)
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_1.pth')))
     dice_acc = []
     asd_acc = []
     hd_acc = []
     sen_acc = []
+    acc = []
     with torch.no_grad():
         model.eval()
-        for (x, y), _, _ in tqdm(data_loder):
-            x = torch.unsqueeze(x.cpu().float(), 0)
+        for x, y in tqdm(data_loader):
+            x = x.cpu().float()
             true = y.cpu().float().numpy()
             # j = one_hot(torch.LongTensor(true), 16)
             # i = torch.unsqueeze(i, 1)
@@ -192,4 +194,5 @@ if __name__ == '__main__':
             # dice_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=DICE))
             # hd_acc.append(calculate_acc(output=true, target=pred, class_num=16, fun=HD_95))
             # sen_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=Sensitivity))
-            print('done')
+            acc.append((np.sum(np.array(pred) == np.array(true))) / (len(pred.flatten())))
+        print('done')

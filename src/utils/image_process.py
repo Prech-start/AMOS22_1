@@ -102,8 +102,15 @@ def save_image_information(index, pred_array):
     with open(os.path.join('..', 'checkpoints', 'tr_ts_inf', 'testx.li_x.li'), 'rb+') as f:
         images_path = pickle.load(f)
     struct = sitk.ReadImage(os.path.join(path, str(images_path[index], 'utf-8')))
-    shape = np.array(sitk.GetArrayViewFromImage(struct)).shpae
+    shape = np.array(sitk.GetArrayFromImage(struct)).shape
     pred_array = resize(pred_array, shape, order=0, preserve_range=True, anti_aliasing=False)
+
     result_image = sitk.GetImageFromArray(pred_array)
+
     result_image.CopyInformation(struct)
-    sitk.WriteImage(result_image, './results/{}'.format(images_path[index].rsplit('/', 1)[1]))
+
+    sitk.WriteImage(result_image, 'a.nii')
+
+    writer = sitk.ImageFileWriter()
+    writer.SetFileName(os.path.join('.', 'results', '{}'.format(str(images_path[index])[:-1].rsplit('/', 1)[1])))
+    writer.Execute(result_image)

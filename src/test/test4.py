@@ -11,7 +11,7 @@ test_loader = DataLoader(
 model = UnetModel(1, 16, 6)
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot2.pth')))
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot.pth')))
-model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_0.pth')))
+model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_1.pth')))
 model.cpu()
 
 def show_result(model):
@@ -33,10 +33,10 @@ def show_result(model):
             save_image_information(index, result)
             pass
 
-for i, j in test_loader:
-    k = model(i.float())
-    k = torch.argmax(k, 1)
-    # bind(j, k)
-    show_two(j, k, 'e-3', 2 / 3)
-    pass
-# show_result(model)
+# for i, j in test_loader:
+#     k = model(i.float())
+#     k = torch.argmax(k, 1)
+#     # bind(j, k)
+#     show_two(j, k, 'e-3', 2 / 3)
+#     pass
+show_result(model)
