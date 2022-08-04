@@ -1,5 +1,5 @@
 import os
-
+from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import torch
 from matplotlib.pyplot import plot
@@ -14,6 +14,7 @@ from einops import *
 from tqdm import tqdm
 from torch.nn.functional import one_hot
 import copy
+from src.utils.image_process import save_image_information
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
@@ -70,15 +71,12 @@ class EarlyStopping:
 
 def train(pre_train_model, batch_size, criterion, device):
     model = pre_train_model.to(device)
-    # 指定损失函数，可以是其他损失函数，根据训练要求决定
-    # criterion = nn.CrossEntropyLoss()  # 交叉熵
-    # 指定优化器，可以是其他
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     # 初始化 early_stopping 对象
     patience = 20  # 当验证集损失在连续20次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
     early_stopping = EarlyStopping(patience, verbose=True, path=os.path.join('..', 'checkpoints', 'auto_save',
                                                                              'Generalized_Dice_loss_e-3_0.pth'))
-    n_epochs = 1000  # 可以设置大一些，毕竟你是希望通过 early stopping 来结束模型训练
+    n_epochs = 1000
 
     # 建立训练数据的 DataLoader
     train_set = data_set()
@@ -120,7 +118,7 @@ def train(pre_train_model, batch_size, criterion, device):
             y = one_hot(y, 16)
             target = rearrange(y, 'b d w h c -> b c d w h')
             # training param
-            output = model(data)  # 输出模型预测值
+            output = model(Variable(data))  # 输出模型预测值
             loss = criterion(output, target.float())  # 计算损失
             loss.backward()  # 计算损失对于各个参数的梯度
             optimizer.step()  # 执行单步优化操作：更新参数
@@ -130,8 +128,8 @@ def train(pre_train_model, batch_size, criterion, device):
         train_loss.append(np.mean(t_loss))
         model.eval()  # 设置模型为评估/测试模式
         v_loss = []
-        p2 = tqdm(valid_loader)
-        for test, y in p2:
+        p2 = tqdm(enumerate(valid_loader))
+        for index, (test, y) in p2:
             model = model.cpu()
             y = torch.LongTensor(y.long())
             y = one_hot(y, 16)
@@ -140,6 +138,9 @@ def train(pre_train_model, batch_size, criterion, device):
             loss = criterion(PRED, target.float())
             v_loss.append(loss.item())
             p2.set_description('epoch:{}, valid_arg_loss:{}'.format(epoch, np.mean(v_loss)))
+            # TODO: 验证时使用的例子太多，验证缓慢。容易振荡
+            if index > 3:
+                break
         valid_loss.append(np.mean(v_loss))
         early_stopping(np.mean(v_loss), model)
         # 若满足 early stopping 要求
@@ -150,20 +151,41 @@ def train(pre_train_model, batch_size, criterion, device):
         len_train = len(train_loss)
         line1 = plt.plot([i for i in range(len_train)], train_loss, '-', label='train_loss')
         line2 = plt.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss')
-        plt.legend((line1, line2))
-        plt.savefig('loss_line.png', bbox_inches='tight')
+        plt.savefig('loss_line_0.png', bbox_inches='tight')
     len_train = len(train_loss)
-    line1 = plt.plot([i for i in range(len_train)], train_loss, '-', label='train_loss')
-    line2 = plt.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss')
-    plt.legend((line1, line2))
+    plt.plot([i for i in range(len_train)], train_loss, '-', label='train_loss')
+    plt.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss')
+    plt.legend()
     plt.savefig('loss_line_final.png', bbox_inches='tight')
     # 获得 early stopping 时的模型参数
     return model
+
+
+def show_result(model):
+    # 获取所有的valid样本
+    test_data = data_set(False)
+    data_loader = DataLoader(
+        dataset=test_data,
+        batch_size=1,
+        pin_memory=True,
+        shuffle=True
+    )
+    with torch.no_grad():
+        # 对每一个测试案例做展示并保存
+        for index, (x, y) in enumerate(data_loader):
+            PRED = model(x.float())
+            result = torch.argmax(PRED, dim=1)
+            result = result.data.squeeze().cpu().numpy()
+            save_image_information(index, result)
+            pass
 
 
 if __name__ == '__main__':
     class_num = 16
     model = UnetModel(1, class_num, 6)
     # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_0.pth')))
-    model = train(model, 1, Generalized_Dice_loss([1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4]),
+    # loss = Generalized_Dice_loss([1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4])
+    loss = nn.BCELoss()
+    # TODO: loss = nn.BCELoss()
+    model = train(model, 1, loss,
                   torch.device('cuda'))

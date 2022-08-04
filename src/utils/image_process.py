@@ -8,6 +8,7 @@ import nibabel as nib
 from einops import rearrange
 from src.process.data_load import *
 from torch.utils.data import DataLoader
+import skimage
 
 
 def a(images, outputs):
@@ -74,7 +75,7 @@ def bind(a, b):
     img.save('..' + '/result_overlap/pt_{}_compare_{}.png'.format(1, 2))
 
 
-def show_two(a, b, file_name, slices=1.0/2):
+def show_two(a, b, file_name, slices=1.0 / 2):
     a = a.data.squeeze().cpu().numpy()
     b = b.data.squeeze().cpu().numpy()
     ori_image = np.expand_dims(a[int(a.shape[0] * slices), :, :], -1)
@@ -94,3 +95,15 @@ def show_two(a, b, file_name, slices=1.0/2):
         image_show.save('..' + '/result_overlap/{}.png'.format(file_name))
     else:
         image_show.save('..' + '/result_overlap/pt_{}_compare_{}.png'.format(1, 2))
+
+
+def save_image_information(index, pred_array):
+    _, path = load_json('AMOS22', 'task1_dataset.json')
+    with open(os.path.join('..', 'checkpoints', 'tr_ts_inf', 'testx.li_x.li'), 'rb+') as f:
+        images_path = pickle.load(f)
+    struct = sitk.ReadImage(os.path.join(path, str(images_path[index], 'utf-8')))
+    shape = np.array(sitk.GetArrayViewFromImage(struct)).shpae
+    pred_array = resize(pred_array, shape, order=0, preserve_range=True, anti_aliasing=False)
+    result_image = sitk.GetImageFromArray(pred_array)
+    result_image.CopyInformation(struct)
+    sitk.WriteImage(result_image, './results/{}'.format(images_path[index].rsplit('/', 1)[1]))

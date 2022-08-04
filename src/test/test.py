@@ -159,6 +159,6 @@ def cal_subject_level_dice(prediction, target, class_num=2):# class_num是你分
 
 if __name__ == '__main__':
     m = UnetModel(1, 16, 6)
-    m.load_state_dict(torch.load(os.path.join(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot_e-3.pth'))))
+    m.load_state_dict(torch.load(os.path.join(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_0.pth'))))
     m.cpu()
     acc(m)
