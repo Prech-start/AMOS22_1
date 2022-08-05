@@ -100,12 +100,12 @@ def show_result(model):
 
 
 if __name__ == '__main__':
-    class_num = 16
+    class_num = 163
     learning_rate = 1e-4
     model = UnetModel(1, class_num, 6)
     # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_1.pth')))
     # loss = Generalized_Dice_loss([1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4])
     loss = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    # TODO: loss = nn.BCELoss()
+    # TODO: loss = nn.BCELoss() -
     model = train(pre_train_model=model, batch_size=1, optimizer=optimizer, criterion=loss, device=torch.device('cuda'))
