@@ -40,7 +40,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
             loss.backward()
             optimizer.step()
             t_loss.append(loss.item())
-            print('\r \t {}/{}:train_loss = {}'.format(index+1, len(data_loader), loss.item()), end="")
+            print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
         else:
             # valid data
             model.eval()
@@ -52,7 +52,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
             output = model(Variable(data.float()))
             loss = criterion(output, target.float())
             v_loss.append(loss.item())
-            print('\r \t {}/{}:valid_loss = {}'.format(index+1, len(data_loader), loss.item()), end="")
+            print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
     # ----------------------------------------------------
     # 返回每一个epoch的mean_loss
     print()
@@ -66,8 +66,9 @@ def train(pre_train_model, batch_size, optimizer, criterion, device):
     train_valid_loader = get_dataloader(batch_size=batch_size)
     # ----------------------------------------------------------------
     for epoch in range(1, n_epochs + 1):
-        print('{}/{} epoch:'.format(epoch, n_epochs))
-        train_loss, valid_loss = train_and_valid_model(epoch=epoch, model=pre_train_model, data_loader=train_valid_loader,
+        print('{} / {} epoch:'.format(epoch, n_epochs))
+        train_loss, valid_loss = train_and_valid_model(epoch=epoch, model=pre_train_model,
+                                                       data_loader=train_valid_loader,
                                                        device=device, optimizer=optimizer, criterion=criterion)
         # 每30次保存一次模型
         if epoch % 30 == 0:
