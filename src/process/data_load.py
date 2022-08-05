@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from src.utils.file_load import *
 import nibabel as nib
 import pickle
@@ -55,4 +55,11 @@ class data_set(Dataset):
         return x
 
 
-
+def get_dataloader(is_train=True, is_shuffle=True, batch_size=1):
+    data = data_set(is_train)
+    return DataLoader(
+        dataset=data,
+        batch_size=batch_size,
+        pin_memory=True,
+        shuffle=is_shuffle
+    )
