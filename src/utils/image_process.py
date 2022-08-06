@@ -81,7 +81,11 @@ def show_two(a, b, file_name, slices=1.0 / 2):
     ori_image = np.expand_dims(a[int(a.shape[0] * slices), :, :], -1)
     mask_image = np.expand_dims(b[int(b.shape[0] * slices), :, :], -1)
     img_show = np.concatenate((ori_image, mask_image), axis=0)
-    image_show = array_to_img(img_show)
+    image_show = Image.fromarray(img_show[:, :, 0].astype('uint8'), 'P')
+    palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51, 255,
+                   102, 153, 51, 102, 102, 51, 153, 255, 20, 20, 20, 255, 255, 194, 10, 255, 51, 51, 153, 255, 255, 61,
+                   255, 0, 128]
+    image_show.putpalette(palettedata)
     image_show = image_show.convert('RGB')
     if file_name != '' or None:
         image_show.save('..' + '/result_overlap/{}.png'.format(file_name))
@@ -108,8 +112,8 @@ def save_image_information(index, pred_array):
     writer.Execute(result_image)
 
 
-a = np.ones(shape=(1, 1, 56, 224, 224))
-b = np.zeros(shape=(1, 1, 56, 224, 224))
-a = torch.Tensor(a)
-b = torch.Tensor(b)
-show_two(a, b, 'test')
+# a = np.ones(shape=(1, 1, 56, 224, 224))
+# b = np.zeros(shape=(1, 1, 56, 224, 224))
+# a = torch.Tensor(a)
+# b = torch.Tensor(b)
+# show_two(a, b, 'test')

@@ -9,13 +9,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from src.process.data_load import *
 from src.model.model import *
-from loss import *
 from einops import *
 from tqdm import tqdm
 from torch.nn.functional import one_hot
 import copy
 from src.utils.image_process import save_image_information
 from src.utils.train_utils import *
+import gc
 
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
@@ -49,7 +49,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
             y = one_hot(y, 16)
             target = rearrange(y, 'b d w h c -> b c d w h')
             # training param
-            output = model(Variable(data.float()))
+            output = model(data.float())
             loss = criterion(output, target.float())
             v_loss.append(loss.item())
             print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
@@ -98,9 +98,8 @@ def show_result(model):
             save_image_information(index, result)
             pass
 
-
 if __name__ == '__main__':
-    class_num = 163
+    class_num = 16
     learning_rate = 1e-4
     model = UnetModel(1, class_num, 6)
     # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Generalized_Dice_loss_e-3_1.pth')))
