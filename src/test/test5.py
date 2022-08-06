@@ -4,13 +4,13 @@ from random import sample, choices
 from src.utils.image_process import *
 import torch
 
-
 COL = 3
 ROW = 1
 HEIGHT = 256
 WIDTH = 256
 
-def concat_image(ORI, GT, PRED, save_path, no=0, slices=1.0/3):
+
+def concat_image(ORI, GT, PRED, save_path, no=0, slices=1.0 / 3):
     '''
         ORI shape = b,c,d,w,h
         G T shape = b,c,d,w,h
@@ -40,15 +40,14 @@ def concat_image(ORI, GT, PRED, save_path, no=0, slices=1.0/3):
     image_files = [ORI, GT, PRED]
     for row in range(ROW):
         for col in range(COL):
-            target.paste(image_files[COL * row + col], (0 + WIDTH * col, 0 + HEIGHT*row))
+            target.paste(image_files[COL * row + col], (0 + WIDTH * col, 0 + HEIGHT * row))
     if save_path != '' or None:
         target.save('..' + '/result_overlap/{}.png'.format(save_path))
     else:
         target.save('..' + '/result_overlap/pt{}_ori_compare_gt_and_pred.png'.format(no))
 
 
-
-def trans_iamge(x, slices, mode='P'):
+def trans_iamge(x, slices, mode="P"):
     # 删除为一的维度 batchsize，channel
     x = x.data.squeeze().cpu().numpy()
     # 将d维度转移到最后一维 
@@ -58,5 +57,5 @@ def trans_iamge(x, slices, mode='P'):
     return x
 
 
-a = torch.Tensor(np.random.random(0,15,(1, 1, 64, WIDTH, HEIGHT)))
-concat_image(a,a,a)
+a = torch.Tensor(np.random.randint(0, 15, (1, 1, 64, WIDTH, HEIGHT)))
+concat_image(a, a, a)
