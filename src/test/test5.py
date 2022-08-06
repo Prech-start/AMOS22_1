@@ -1,6 +1,5 @@
-import os
-from PIL import Image
-from random import sample, choices
+import numpy as np
+from PIL.Image import Image
 from src.utils.image_process import *
 import torch
 
@@ -10,7 +9,7 @@ HEIGHT = 256
 WIDTH = 256
 
 
-def concat_image(ORI, GT, PRED, save_path, no=0, slices=1.0 / 3):
+def concat_image(ORI, GT, PRED, save_path='', no=0, slices=1.0 / 3):
     '''
         ORI shape = b,c,d,w,h
         G T shape = b,c,d,w,h
@@ -36,7 +35,7 @@ def concat_image(ORI, GT, PRED, save_path, no=0, slices=1.0 / 3):
     PRED.putpalette(palettedata)
     GT = GT.convert('RGB')
     PRED = PRED.convert('RGB')
-    target = Image.new('P', (WIDTH * HEIGHT * ROW))
+    target = Image.new('RGB', (WIDTH * COL, HEIGHT * ROW))
     image_files = [ORI, GT, PRED]
     for row in range(ROW):
         for col in range(COL):
@@ -57,5 +56,5 @@ def trans_iamge(x, slices, mode="P"):
     return x
 
 
-a = torch.Tensor(np.random.randint(0, 15, (1, 1, 64, WIDTH, HEIGHT)))
+a = torch.Tensor(np.random.randint(0, 15,(1, 1, 64, WIDTH, HEIGHT)))
 concat_image(a, a, a)
