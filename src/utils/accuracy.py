@@ -5,7 +5,7 @@ import numpy as np
 from torch.nn.functional import one_hot
 from torch.utils.data import DataLoader
 from scipy.optimize import linear_sum_assignment
-from hausdorff import hausdorff_distance
+# from surface_distance. import hausdorff_distance
 from src.process.data_load import *
 from src.model.model import *
 from einops import *
@@ -136,7 +136,7 @@ def Sensitivity(output, target):
     intersection = (output * target).sum()
 
     print((intersection + smooth) / \
-           (target.sum() + smooth))
+          (target.sum() + smooth))
 
     return (intersection + smooth) / \
            (target.sum() + smooth)
@@ -144,13 +144,15 @@ def Sensitivity(output, target):
 
 def calculate_acc(output, target, class_num, fun):
     # input: class_tensor
+    # output shape b c w h d
     # return:
+    # 将每一个通道都做一次acc计算
     acc = []
     for i in range(class_num):
         pred = copy.deepcopy(output)
         true = copy.deepcopy(target)
-        pred[pred != i] = 0
-        true[true != i] = 0
+        # pred[pred != i] = 0
+        # true[true != i] = 0
         if fun != ASD:
             pred = one_hot(torch.LongTensor(pred), 16)
             true = one_hot(torch.LongTensor(true), 16)
@@ -163,6 +165,26 @@ def calculate_acc(output, target, class_num, fun):
 
     # acc.append(output, target)
     return acc
+
+
+def calculate_acc2(output, target, class_num, fun):
+    # input: class_tensor
+    # output, target's shape b c w h d
+    # return: 每一个通道所计算出来的指标的值
+    # 将每一个通道都做一次acc计算
+    acc = []
+    for i in range(class_num):
+        pred = copy.deepcopy(output.data.squeeze().numpy())
+        true = copy.deepcopy(target.data.squeeze().numpy())
+        pred = one_hot(torch.LongTensor(pred), 16).numpy().astype(bool)
+        true = one_hot(torch.LongTensor(true), 16).numpy().astype(bool)
+        pred = pred[..., i]
+        true = true[..., i]
+        acc.append(fun(pred, true))
+    # acc.append(output, target)
+    return acc
+
+
 from tqdm import tqdm
 
 if __name__ == '__main__':
@@ -191,8 +213,10 @@ if __name__ == '__main__':
             pred = model(x)
             pred = torch.argmax(pred, dim=1)
             # asd_acc.append(calculate_acc(output=true, target=pred, class_num=16, fun=ASD))
-            # dice_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=DICE))
+            dice_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=DICE))
             # hd_acc.append(calculate_acc(output=true, target=pred, class_num=16, fun=HD_95))
             # sen_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=Sensitivity))
-            acc.append((np.sum(np.array(pred) == np.array(true))) / (len(pred.flatten())))
+            # acc.append((np.sum(np.array(pred) == np.array(true))) / (len(pred.flatten())))
         print('done')
+x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
+calculate_acc2(x, x, 16, DICE)
