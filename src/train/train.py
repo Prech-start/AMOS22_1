@@ -60,20 +60,23 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
 
 
 def train(pre_train_model, batch_size, optimizer, criterion, device):
-    path = os.path.join('..', 'checkpoints', 'auto_save'
-                        )
+    path = os.path.join('..', 'checkpoints', 'auto_save')
     n_epochs = 300
     train_valid_loader = get_dataloader(batch_size=batch_size)
+    train_loss = []
+    valid_loss = []
     # ----------------------------------------------------------------
     for epoch in range(1, n_epochs + 1):
         print('{} / {} epoch:'.format(epoch, n_epochs))
-        train_loss, valid_loss = train_and_valid_model(epoch=epoch, model=pre_train_model,
+        t_loss, v_loss = train_and_valid_model(epoch=epoch, model=pre_train_model,
                                                        data_loader=train_valid_loader,
                                                        device=device, optimizer=optimizer, criterion=criterion)
         # 每30次保存一次模型
         if epoch % 30 == 0:
             torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch)))
         torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))
+        train_loss.append(t_loss)
+        valid_loss.append(t_loss)
         # 保存训练的loss
         save_loss(train_loss, valid_loss)
     pic_loss_line()
