@@ -56,5 +56,8 @@ def trans_iamge(x, slices, mode="P"):
     return x
 
 
-a = torch.Tensor(np.random.randint(0, 15,(1, 1, 64, WIDTH, HEIGHT)))
-concat_image(a, a, a)
+# a = torch.Tensor(np.random.randint(0, 15,(1, 1, 64, WIDTH, HEIGHT)))
+# concat_image(a, a, a)
+from src.utils.train_utils import *
+pic_loss_line()
+print('0')

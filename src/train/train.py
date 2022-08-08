@@ -76,7 +76,7 @@ def train(pre_train_model, batch_size, optimizer, criterion, device):
             torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch)))
         torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))
         train_loss.append(t_loss)
-        valid_loss.append(t_loss)
+        valid_loss.append(v_loss)
         # 保存训练的loss
         save_loss(train_loss, valid_loss)
     pic_loss_line()
