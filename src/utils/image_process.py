@@ -1,3 +1,5 @@
+import copy
+
 import torch
 
 import PIL.Image as Image
@@ -117,3 +119,21 @@ def save_image_information(index, pred_array):
 # a = torch.Tensor(a)
 # b = torch.Tensor(b)
 # show_two(a, b, 'test')
+import SimpleITK as sitk
+model = UnetModel(1, 16, 6)
+model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+ori_image = sitk.ReadImage('amos_0573.nii.gz')
+model.cpu()
+
+x = copy.deepcopy(ori_image)
+x = np.array(sitk.GetArrayFromImage(x))
+shape_ = x.shape
+x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
+x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
+pred = model(x)
+pred = torch.argmax(pred, dim=1)
+pred = pred.data.cpu().squeeze().numpy()
+pred_array = resize(pred, shape_, order=0, preserve_range=True, anti_aliasing=False)
+result_image = sitk.GetImageFromArray(pred_array)
+result_image.CopyInformation(ori_image)
+sitk.WriteImage(result_image, 'a.nii.gz')
