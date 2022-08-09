@@ -99,7 +99,7 @@ def save_image_information(index, pred_array):
     _, path = load_json('AMOS22', 'task1_dataset.json')
     with open(os.path.join('..', 'checkpoints', 'tr_ts_inf', 'testx.li_x.li'), 'rb+') as f:
         images_path = pickle.load(f)
-    struct = sitk.ReadImage(os.path.join(path, str(images_path[index], 'utf-8')))
+    struct = sitk.ReadImage(os.path.join(path, str(images_path[index])))
     shape = np.array(sitk.GetArrayFromImage(struct)).shape
     pred_array = resize(pred_array, shape, order=0, preserve_range=True, anti_aliasing=False)
 
