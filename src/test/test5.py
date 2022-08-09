@@ -25,9 +25,9 @@ def concat_image(ORI, GT, PRED, save_path='', no=0, slices=1.0 / 3):
     # PRED = np.expand_dims(PRED[int(PRED.shape[0] * slices), :, :], -1)
     # # 将ORI,GT,PRED转化为PIL的image
     # Image.fromarray(img_show[:, :, 0].astype('uint8'), 'P')
-    ORI = trans_iamge(ORI, slices=slices, mode='L')
-    GT = trans_iamge(GT, slices=slices, mode='P')
-    PRED = trans_iamge(PRED, slices=slices, mode='P')
+    ORI = trans_image(ORI, slices=slices, mode='L')
+    GT = trans_image(GT, slices=slices, mode='P')
+    PRED = trans_image(PRED, slices=slices, mode='P')
     palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51, 255,
                    102, 153, 51, 102, 102, 51, 153, 255, 20, 20, 20, 255, 255, 194, 10, 255, 51, 51, 153, 255, 255, 61,
                    255, 0, 128]
@@ -46,7 +46,7 @@ def concat_image(ORI, GT, PRED, save_path='', no=0, slices=1.0 / 3):
         target.save('..' + '/result_overlap/pt{}_ori_compare_gt_and_pred.png'.format(no))
 
 
-def trans_iamge(x, slices, mode="P"):
+def trans_image(x, slices, mode="P"):
     # 删除为一的维度 batchsize，channel
     x = x.data.squeeze().cpu().numpy()
     # 将d维度转移到最后一维 
