@@ -95,45 +95,37 @@ def show_two(a, b, file_name, slices=1.0 / 2):
         image_show.save('..' + '/result_overlap/pt_{}_compare_{}.png'.format(1, 2))
 
 
-def save_image_information(index, pred_array):
-    _, path = load_json('AMOS22', 'task1_dataset.json')
-    with open(os.path.join('..', 'checkpoints', 'tr_ts_inf', 'testx.li_x.li'), 'rb+') as f:
-        images_path = pickle.load(f)
-    struct = sitk.ReadImage(os.path.join(path, str(images_path[index])))
-    shape = np.array(sitk.GetArrayFromImage(struct)).shape
-    pred_array = resize(pred_array, shape, order=0, preserve_range=True, anti_aliasing=False)
+import SimpleITK as sitk
 
-    result_image = sitk.GetImageFromArray(pred_array)
 
-    result_image.CopyInformation(struct)
-
-    sitk.WriteImage(result_image, 'a.nii')
-
-    writer = sitk.ImageFileWriter()
-    writer.SetFileName(os.path.join('.', 'results', '{}'.format(str(images_path[index])[:-1].rsplit('/', 1)[1])))
-    writer.Execute(result_image)
-
+# 按照文件列表保存
+def save_image_information():
+    _, path = load_json('AMOS22', 'task_dataset.json')
+    with open(os.path.join('..', 'checkpoints', 'tr_ts_inf', 'test.li_x.li', 'rb+')) as f:
+        image_path = pickle.load(f)
+    model = UnetModel(1, 16, 6)
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+    for file_path in image_path:
+        ori_image = sitk.ReadImage(os.path.join(path, str(file_path)))
+        model.cpu()
+        x = copy.deepcopy(ori_image)
+        x = np.array(sitk.GetArrayFromImage(x))
+        shape_ = x.shape
+        x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
+        x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
+        pred = model(x)
+        pred = torch.argmax(pred, dim=1)
+        pred = pred.data.cpu().squeeze().numpy()
+        pred_array = resize(pred, shape_, order=0, preserve_range=True, anti_aliasing=False)
+        result_image = sitk.GetImageFromArray(pred_array)
+        result_image.CopyInformation(ori_image)
+        sitk.WriteImage(result_image,
+                        os.path.join('..', 'output', 'predict', '{}'.format(str(file_path)[:-1].rsplit('/', 1)[1])))
+        print()
 
 # a = np.ones(shape=(1, 1, 56, 224, 224))
 # b = np.zeros(shape=(1, 1, 56, 224, 224))
 # a = torch.Tensor(a)
 # b = torch.Tensor(b)
 # show_two(a, b, 'test')
-import SimpleITK as sitk
-model = UnetModel(1, 16, 6)
-model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
-ori_image = sitk.ReadImage('amos_0573.nii.gz')
-model.cpu()
-
-x = copy.deepcopy(ori_image)
-x = np.array(sitk.GetArrayFromImage(x))
-shape_ = x.shape
-x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
-x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
-pred = model(x)
-pred = torch.argmax(pred, dim=1)
-pred = pred.data.cpu().squeeze().numpy()
-pred_array = resize(pred, shape_, order=0, preserve_range=True, anti_aliasing=False)
-result_image = sitk.GetImageFromArray(pred_array)
-result_image.CopyInformation(ori_image)
-sitk.WriteImage(result_image, 'a.nii.gz')
+save_image_information()
