@@ -124,6 +124,7 @@ def save_image_information():
                         os.path.join('..', 'output', 'predict', '{}'.format(str(file_path)[:-1].rsplit('/', 1)[1])))
         print()
 
+
 COL = 3
 ROW = 1
 HEIGHT = 256
@@ -176,9 +177,35 @@ def trans_image(x, slices, mode="P"):
     x = Image.fromarray(x[:, :, 0].astype('uint8'), mode=mode)
     return x
 
+
+def norm(x):
+    x = x + 1024.0
+    x = np.clip(x, a_min=0, a_max=2048.0)
+    x = x / 2048
+    return x
+
 # a = np.ones(shape=(1, 1, 56, 224, 224))
 # b = np.zeros(shape=(1, 1, 56, 224, 224))
 # a = torch.Tensor(a)
 # b = torch.Tensor(b)
 # show_two(a, b, 'test')
 # save_image_information()
+import SimpleITK as sitk
+
+model = UnetModel(1, 16, 6)
+model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+ori_image = sitk.ReadImage('amos_0573.nii.gz')
+model.cpu()
+x = copy.deepcopy(ori_image)
+x = np.array(sitk.GetArrayFromImage(x))
+shape_ = x.shape
+x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
+x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
+x = norm(x)
+pred = model(x)
+pred = torch.argmax(pred, dim=1)
+pred = pred.data.cpu().squeeze().numpy()
+pred_array = resize(pred, shape_, order=0, preserve_range=True, anti_aliasing=False)
+result_image = sitk.GetImageFromArray(pred_array)
+result_image.CopyInformation(ori_image)
+sitk.WriteImage(result_image, '0573.nii.gz')
