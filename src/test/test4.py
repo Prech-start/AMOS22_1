@@ -1,7 +1,7 @@
 from src.utils.image_process import *
 from src.model.model import *
 
-test_data = data_set()
+test_data = data_set(False)
 # 把dataset放到DataLoader中
 test_loader = DataLoader(
     dataset=test_data,

@@ -215,7 +215,7 @@ if __name__ == '__main__':
         "16": "total"
     }
     model = UnetModel(1, 16, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-150.pth')))
     dice_acc = []
     asd_acc = []
     hd_acc = []
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     data_matrix = pd.DataFrame(acc_matrix)
     data_matrix.columns = ['DICE', 'ASD_GT2PRED', 'ASD_PRED2GT', 'HD_95', 'SENSITIVITY']
     data_matrix.index = dict_.values()
-    writer = pd.ExcelWriter('accuracy.xlsx')
+    writer = pd.ExcelWriter('accuracy_1.xlsx')
     data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
     writer.save()
     print('done')

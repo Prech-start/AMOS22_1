@@ -32,6 +32,7 @@ class data_set(Dataset):
     def __getitem__(self, index):
         x = sitk.GetArrayFromImage(
             sitk.ReadImage(os.path.join(self.path, str(self.images_path[index], 'utf-8')))).astype(np.int16)
+        # print(bytes.decode(self.images_path[index]))
         y = sitk.GetArrayFromImage(
             sitk.ReadImage(os.path.join(self.path, str(self.labels_path[index], 'utf-8')))).astype(np.int8)
         x = np.array(x, dtype=float)
