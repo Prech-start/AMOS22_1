@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.autograd import Variable
+import torch.nn.functional as F
 
 
 class DiceLoss(nn.Module):
@@ -75,3 +77,32 @@ class Generalized_Dice_loss(nn.Module):
 
     def forward(self, y_pred, y_true):
         return self.Generalized_Dice_Loss(y_pred, y_true, self.class_weight)
+
+
+class BCELoss_with_weight(nn.Module):
+    def __init__(self, weight):
+        super(BCELoss_with_weight, self).__init__()
+        self.weight = weight
+
+    def forward(self, pred, true):
+        if len(self.weight) != pred.shape[1]:
+            print('shape is not mapping')
+            exit()
+        wei_sum = sum(self.weight)
+        weight_loss = 0.
+        for i, class_weight in enumerate(self.weight):
+            pred_i = pred[:, i]
+            true_i = true[:, i]
+            weight_loss += (
+                        class_weight / wei_sum * F.binary_cross_entropy(pred_i, true_i, reduction='mean'))
+        weight_loss.requires_grad_(True)
+        return weight_loss
+
+
+# loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
+# bce = BCELoss_with_weight(weight=loss_weight)
+# a = torch.FloatTensor(np.ones(shape=[1, 16, 50, 50, 50]))
+# b = torch.FloatTensor(np.zeros(shape=[1, 16, 50, 50, 50]))
+# k = bce(a, b)
+# k.backward()
+# print(k.item())

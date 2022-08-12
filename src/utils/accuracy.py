@@ -172,8 +172,8 @@ def calculate_acc(output, target, class_num, fun):
     # HD_95计算库的dtype为np.numeric
     dtype_ = bool
     for i in range(class_num):
-        if i == 12:
-            continue
+        # if i == 12:
+        #     continue
         pred = copy.deepcopy(output.data.squeeze().numpy())
         true = copy.deepcopy(target.data.squeeze().numpy())
         pred = one_hot(torch.LongTensor(pred), 16).numpy().astype(dtype_)

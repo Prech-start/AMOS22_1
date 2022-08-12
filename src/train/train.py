@@ -16,12 +16,15 @@ import copy
 from src.utils.image_process import save_image_information
 from src.utils.train_utils import *
 import gc
+from loss import BCELoss_with_weight
+from src.utils.accuracy import *
 
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
     # ---------------------------------------------------
     t_loss = []
     v_loss = []
+    v_acc = []
     # ---------------------------------------------------
     for index, (data, y) in enumerate(data_loader):
         if index < len(data_loader) - 2:
@@ -51,12 +54,13 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
             # training param
             output = model(data.float())
             loss = criterion(output, target.float())
+            v_acc.append(np.mean(calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE)))
             v_loss.append(loss.item())
             print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
     # ----------------------------------------------------
     # 返回每一个epoch的mean_loss
     print()
-    return np.mean(t_loss), np.mean(v_loss)
+    return np.mean(t_loss), np.mean(v_loss), np.mean(v_acc)
 
 
 def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load):
@@ -64,10 +68,11 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
     train_valid_loader = get_dataloader(batch_size=batch_size)
     train_loss = []
     valid_loss = []
+    valid_acc = []
     # ----------------------------------------------------------------
     for epoch in range(1, n_epochs + 1):
         print('{} / {} epoch:'.format(epoch, n_epochs))
-        t_loss, v_loss = train_and_valid_model(epoch=epoch, model=pre_train_model,
+        t_loss, v_loss, v_acc = train_and_valid_model(epoch=epoch, model=pre_train_model,
                                                data_loader=train_valid_loader,
                                                device=device, optimizer=optimizer, criterion=criterion)
         # 每30次保存一次模型
@@ -76,9 +81,10 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
         torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))
         train_loss.append(t_loss)
         valid_loss.append(v_loss)
+        valid_acc.append(v_acc)
         # 保存训练的loss
         if not is_load:
-            save_loss(train_loss, valid_loss)
+            save_loss(train_loss, valid_loss, valid_acc)
     pic_loss_line()
     return pre_train_model
 
@@ -111,7 +117,7 @@ if __name__ == '__main__':
     if is_load:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-    loss = nn.BCELoss()
+    loss = BCELoss_with_weight(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # TODO: loss = nn.BCELoss()
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
