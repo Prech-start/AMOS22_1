@@ -59,7 +59,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
     return np.mean(t_loss), np.mean(v_loss)
 
 
-def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device):
+def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load):
     path = os.path.join('..', 'checkpoints', 'auto_save')
     train_valid_loader = get_dataloader(batch_size=batch_size)
     train_loss = []
@@ -71,13 +71,14 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device):
                                                data_loader=train_valid_loader,
                                                device=device, optimizer=optimizer, criterion=criterion)
         # 每30次保存一次模型
-        if epoch % 30 == 0:
+        if epoch % 20 == 0:
             torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch)))
         torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))
         train_loss.append(t_loss)
         valid_loss.append(v_loss)
         # 保存训练的loss
-        save_loss(train_loss, valid_loss)
+        if not is_load:
+            save_loss(train_loss, valid_loss)
     pic_loss_line()
     return pre_train_model
 
@@ -104,12 +105,14 @@ def show_result(model):
 if __name__ == '__main__':
     class_num = 16
     learning_rate = 1e-4
-    epoch = 20
+    epoch = 300
     model = UnetModel(1, class_num, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
-    # loss = Generalized_Dice_loss([1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4])
+    is_load = False
+    if is_load:
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
+    loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    # TODO: loss = nn.BCELoss() -
+    # TODO: loss = nn.BCELoss()
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
-                  device=torch.device('cuda'))
+                  device=torch.device('cuda'), is_load=is_load)

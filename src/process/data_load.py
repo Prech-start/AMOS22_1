@@ -61,6 +61,5 @@ def get_dataloader(is_train=True, is_shuffle=True, batch_size=1):
     return DataLoader(
         dataset=data,
         batch_size=batch_size,
-        pin_memory=True,
         shuffle=is_shuffle
     )
