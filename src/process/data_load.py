@@ -10,7 +10,7 @@ import SimpleITK as sitk
 
 class data_set(Dataset):
     def __init__(self, is_train=True, is_test=False):
-        self.task_json, self.path = load_json('AMOS22', 'task1_dataset.json')
+        self.path = os.path.join('..', '..', 'data', 'AMOS22')
         self.is_train = is_train
         if is_train:
             with open(os.path.join('..', 'checkpoints', 'tr_ts_inf', 'trainx.li_x.li'), 'rb+') as f:

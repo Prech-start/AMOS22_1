@@ -1,4 +1,4 @@
-import os
+import os,sys
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import torch
@@ -17,8 +17,9 @@ from src.utils.image_process import save_image_information
 from src.utils.train_utils import *
 import gc
 from loss import BCELoss_with_weight
+sys.path.append('..')
 from src.utils.accuracy import *
-
+import src.process.task2_data_loader as task2_data_loader
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
     # ---------------------------------------------------
@@ -54,7 +55,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
             # training param
             output = model(data.float())
             loss = criterion(output, target.float())
-            v_acc.append(np.mean(calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE)))
+            v_acc.append(np.mean(calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE, is_training=True)))
             v_loss.append(loss.item())
             print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
     # ----------------------------------------------------
@@ -64,8 +65,8 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
 
 
 def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load):
-    path = os.path.join('..', 'checkpoints', 'auto_save')
-    train_valid_loader = get_dataloader(batch_size=batch_size)
+    path = os.path.join('..', 'checkpoints', 'auto_save_task2')
+    train_valid_loader = task2_data_loader.get_dataloader(batch_size=batch_size)
     train_loss = []
     valid_loss = []
     valid_acc = []
@@ -113,9 +114,14 @@ if __name__ == '__main__':
     learning_rate = 1e-4
     epoch = 300
     model = UnetModel(1, class_num, 6)
+    # 是否加载模型
     is_load = False
+    # 是否迁移模型
+    is_move = True
     if is_load:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
+    if is_move:
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss = BCELoss_with_weight(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

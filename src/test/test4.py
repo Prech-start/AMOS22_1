@@ -11,7 +11,7 @@ test_loader = DataLoader(
 model = UnetModel(1, 16, 6)
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot2.pth')))
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot.pth')))
-model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-final.pth')))
 model.cpu()
 
 def show_result(model):

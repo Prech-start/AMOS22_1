@@ -163,7 +163,7 @@ def Sensitivity(output, target):
 #     return acc
 
 
-def calculate_acc(output, target, class_num, fun):
+def calculate_acc(output, target, class_num, fun, is_training=False):
     # input: class_tensor
     # output, target's shape b c w h d
     # return: 每一个通道所计算出来的指标的值
@@ -172,8 +172,11 @@ def calculate_acc(output, target, class_num, fun):
     # HD_95计算库的dtype为np.numeric
     dtype_ = bool
     for i in range(class_num):
-        # if i == 12:
-        #     continue
+        # 跳过background
+        if i == 0:
+            continue
+        if is_training:
+            break
         pred = copy.deepcopy(output.data.squeeze().numpy())
         true = copy.deepcopy(target.data.squeeze().numpy())
         pred = one_hot(torch.LongTensor(pred), 16).numpy().astype(dtype_)
@@ -198,7 +201,7 @@ if __name__ == '__main__':
         shuffle=True
     )
     dict_ = {
-        "0": "background",
+        # "0": "background",
         "1": "spleen",
         "2": "right kidney",
         "3": "left kidney",
@@ -210,7 +213,7 @@ if __name__ == '__main__':
         "9": "postcava",
         "10": "pancreas",
         "11": "right adrenal gland",
-        # "12": "left adrenal gland",
+        "12": "left adrenal gland",
         "13": "duodenum",
         "14": "bladder",
         "15": "prostate/uterus",
@@ -226,16 +229,19 @@ if __name__ == '__main__':
     error_num = 0
     with torch.no_grad():
         model.eval()
-    for x, y in tqdm(data_loader):
+    for x, y in data_loader:
         x = x.cpu().float()
         true = y.cpu().float()
         pred = model(x)
         pred = torch.argmax(pred, dim=1)
-
-        if np.unique(pred).tolist() != [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15]:
+        print(torch.unique(pred))
+        if np.unique(pred).tolist() == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15]:
             error_num += 1
             continue
         if len(np.unique(true)) != 16:
+            error_num += 1
+            continue
+        if len(np.unique(pred)) != 16:
             error_num += 1
             continue
         # # ok
@@ -257,9 +263,10 @@ if __name__ == '__main__':
     data_matrix = pd.DataFrame(acc_matrix)
     data_matrix.columns = ['DICE', 'ASD_GT2PRED', 'ASD_PRED2GT', 'HD_95', 'SENSITIVITY']
     data_matrix.index = dict_.values()
-    writer = pd.ExcelWriter('accuracy_without_left_adrenal_gland.xlsx')
+    writer = pd.ExcelWriter('accuracy_weight_210.xlsx')
     data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
     writer.save()
+    print('error number:{}/{}'.format(error_num, len(data_loader)))
     print('done')
     # x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
     # calculate_acc2(x, x, 16, DICE)
