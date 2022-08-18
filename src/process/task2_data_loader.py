@@ -1,3 +1,4 @@
+from importlib.resources import path
 import os.path
 
 import numpy as np
@@ -8,11 +9,13 @@ import pickle
 from skimage.transform import resize
 import SimpleITK as sitk
 import json
+import sys
 
-task2_json = json.load(open(os.path.join('..', '..', 'data', 'AMOS22', 'task2_dataset.json')))
+path_dir = os.path.dirname(__file__)
+task2_json = json.load(open(os.path.join(path_dir, '..', '..', 'data', 'AMOS22', 'task2_dataset.json')))
 
-file_path = [[os.path.join('..', '..', 'data', 'AMOS22', path_['image']),
-              os.path.join('..', '..', 'data', 'AMOS22', path_['label'])]
+file_path = [[os.path.join(path_dir, '..', '..', 'data', 'AMOS22', path_['image']),
+              os.path.join(path_dir, '..', '..', 'data', 'AMOS22', path_['label'])]
              for path_ in task2_json['training']]
 
 CT_train_path = file_path[0:160]
@@ -26,7 +29,6 @@ test_path = CT_test_path + MRI_test_path
 class data_set(Dataset):
     def __init__(self, file_path):
         self.paths = file_path
-
 
     def __getitem__(self, item):
         path_ = self.paths

@@ -1,6 +1,6 @@
 from einops import rearrange
 import os.path
-
+import sys
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -39,10 +39,12 @@ def sliding_3D_window(image, window_size, step):
                 yield window
 
 
-task2_json = json.load(open(os.path.join('..', '..', 'data', 'AMOS22', 'task2_dataset.json')))
+path_dir = os.path.dirname(__file__)
 
-file_path = [[os.path.join('..', '..', 'data', 'AMOS22', path_['image']),
-              os.path.join('..', '..', 'data', 'AMOS22', path_['label'])]
+task2_json = json.load(open(os.path.join(path_dir, '..', '..', 'data', 'AMOS22', 'task2_dataset.json')))
+
+file_path = [[os.path.join(path_dir, '..', '..', 'data', 'AMOS22', path_['image']),
+              os.path.join(path_dir, '..', '..', 'data', 'AMOS22', path_['label'])]
              for path_ in task2_json['training']]
 
 CT_train_path = file_path[0:160]
@@ -71,7 +73,7 @@ class data_set(Dataset):
         # y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
-        return sliding_3D_window(x, window_size=self.window_size, step=self.step), y
+        return x, y
 
     def __len__(self):
         return len(self.paths)
@@ -86,6 +88,10 @@ class data_set(Dataset):
             # MRI 图像处理
             x = (x - np.min(x)) / (np.max(x) - np.min(x))
         return x
+
+
+def collate_fun():
+    pass
 
 
 def get_dataloader(is_train=True, batch_size=1):

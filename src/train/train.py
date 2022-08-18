@@ -16,12 +16,55 @@ import copy
 from src.utils.image_process import save_image_information
 from src.utils.train_utils import *
 import gc
-from loss import BCELoss_with_weight
+from src.train.loss import BCELoss_with_weight
 sys.path.append('..')
 from src.utils.accuracy import *
 import src.process.task2_data_loader as task2_data_loader
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
+    # ---------------------------------------------------
+    t_loss = []
+    v_loss = []
+    v_acc = []
+    # ---------------------------------------------------
+    for index, (data, y) in enumerate(data_loader):
+        if index < len(data_loader) - 2:
+            # train_data
+            model.train()
+            model.to(device)
+            optimizer.zero_grad()
+            # trans y to onehot
+            y = torch.LongTensor(y.long())
+            data, y = data.float().to(device), y.to(device)
+            y = one_hot(y, 16)
+            target = rearrange(y, 'b d w h c -> b c d w h')
+            # training param
+            output = model(Variable(data))
+            loss = criterion(output, target.float())
+            loss.backward()
+            optimizer.step()
+            t_loss.append(loss.item())
+            print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
+        else:
+            # valid data
+            model.eval()
+            model.cpu()
+            y = torch.LongTensor(y.long())
+            y = one_hot(y, 16)
+            target = rearrange(y, 'b d w h c -> b c d w h')
+            # training param
+            output = model(data.float())
+            loss = criterion(output, target.float())
+            v_acc.append(np.mean(calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE, is_training=True)))
+            v_loss.append(loss.item())
+            print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
+    # ----------------------------------------------------
+    # 返回每一个epoch的mean_loss
+    print()
+    return np.mean(t_loss), np.mean(v_loss), np.mean(v_acc)
+
+
+def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optimizer, criterion):
     # ---------------------------------------------------
     t_loss = []
     v_loss = []

@@ -13,7 +13,6 @@ import torch.nn.functional as F
 import nibabel as nib
 import glob
 
-from zmq import device
 
 torch.autograd.set_detect_anomaly(True)
 import SimpleITK as sitk
