@@ -1,19 +1,10 @@
-import os.path
 import copy
-import torch
-import numpy as np
 from torch.nn.functional import one_hot
-from torch.utils.data import DataLoader
+# from torch.utils.data import DataLoader
 from scipy.optimize import linear_sum_assignment
-from hausdorff import hausdorff_distance
 from src.process.data_load import *
 from src.model.model import *
-from einops import *
-import math
-from absl.testing import absltest
-from absl.testing import parameterized
 import surface_distance
-from surface_distance import metrics
 from medpy.metric import binary
 
 
@@ -192,14 +183,10 @@ def calculate_acc(output, target, class_num, fun, is_training=False):
 
 from tqdm import tqdm
 import pandas as pd
+from src.process.task2_data_loader import get_dataloader
 
 if __name__ == '__main__':
-    test_data = data_set(False)
-    data_loader = DataLoader(
-        dataset=test_data,
-        batch_size=1,
-        shuffle=True
-    )
+    data_loader = get_dataloader(is_train=False, batch_size=1)
     dict_ = {
         # "0": "background",
         "1": "spleen",
@@ -220,7 +207,7 @@ if __name__ == '__main__':
         "16": "total"
     }
     model = UnetModel(1, 16, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-220.pth')))
     dice_acc = []
     asd_acc = []
     hd_acc = []

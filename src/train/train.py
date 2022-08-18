@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # 是否加载模型
     is_load = False
     # 是否迁移模型
-    is_move = True
+    is_move = False
     if is_load:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
     if is_move:
