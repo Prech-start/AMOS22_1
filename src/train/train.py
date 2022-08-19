@@ -1,4 +1,4 @@
-import os,sys
+import os, sys
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import torch
@@ -17,9 +17,40 @@ from src.utils.image_process import save_image_information
 from src.utils.train_utils import *
 import gc
 from src.train.loss import BCELoss_with_weight
+
 sys.path.append('..')
 from src.utils.accuracy import *
 import src.process.task2_data_loader as task2_data_loader
+import src.process.task2_sliding_window as task2_sliding_window
+import einops
+
+
+def sliding_3D_window2(image, window_size, step):
+    # image.shape = b, c, d, w, h
+    # step must smaller than window_size
+    image = rearrange(image, ' b c d w h -> b c w h d')
+    _, _, width, height, depth = image.shape
+    x_step, y_step, z_step = step
+    x_window_size, y_window_size, z_window_size = window_size
+    is_continue = False
+    for z in range(0, depth, z_step):
+        for y in range(0, height - y_window_size + 1, y_step):
+            for x in range(0, width - x_window_size + 1, x_step):
+                # 1 if z+z_window_size > depth
+                # 2 if z.next() < depth -> z + step_z < depth
+                # 3 step < window
+                if z + z_window_size > depth and z - z_step + z_window_size != depth:
+                    window = image[..., x:x_window_size + x, y:y_window_size + y, -1 - z_window_size:-1]
+                else:
+                    window = image[..., x:(x_window_size + x) if width > x_window_size else -1,
+                             y:(y_window_size + y) if height > y_window_size else -1, z:z_window_size + z]
+                # window = pad(window,)
+                # _, _, w, h, d = window.shape
+                # pad_w =
+                # if window.shape[-1] == 16:
+                #     print(window.shape)
+                yield window
+
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
     # ---------------------------------------------------
@@ -55,7 +86,9 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
             # training param
             output = model(data.float())
             loss = criterion(output, target.float())
-            v_acc.append(np.mean(calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE, is_training=True)))
+            v_acc.append(np.mean(
+                calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
+                              is_training=True)))
             v_loss.append(loss.item())
             print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
     # ----------------------------------------------------
@@ -70,37 +103,48 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
     v_loss = []
     v_acc = []
     # ---------------------------------------------------
-    for index, (data, y) in enumerate(data_loader):
-        if index < len(data_loader) - 2:
-            # train_data
-            model.train()
-            model.to(device)
+    train_loader, valid_loader = data_loader
+    model.train()
+    model.to(device)
+    for index, (x, y) in enumerate(train_loader):
+        y = torch.LongTensor(y.long())
+        y = torch.nn.functional.one_hot(y, 16)
+        y = einops.rearrange(y, 'b d w h c -> b c d w h')
+        fun = sliding_3D_window2
+        for x_win, y_win in zip(fun(x, window_size=(128, 128, 64), step=(96, 96, 48)),
+                                fun(y, window_size=(128, 128, 64), step=(96, 96, 48))):
+            # x_batch = x[..., x_win[2]:x_win[3], x_win[4]:x_win[5], x_win[0]:x_win[1]]
+            # y_batch = y[..., y_win[2]:y_win[3], y_win[4]:y_win[5], y_win[0]:y_win[1]]
             optimizer.zero_grad()
-            # trans y to onehot
-            y = torch.LongTensor(y.long())
-            data, y = data.float().to(device), y.to(device)
-            y = one_hot(y, 16)
-            target = rearrange(y, 'b d w h c -> b c d w h')
-            # training param
-            output = model(Variable(data))
-            loss = criterion(output, target.float())
+            x_batch, y_batch = x_win, y_win
+            if x_batch.shape != (1, 1, 128, 128, 64):
+                continue
+            x_batch = x_batch.to(device)
+            y_batch = y_batch.to(device)
+
+            # print(x_batch.shape)
+            # print(y_batch.shape)
+            pred = model(x_batch)
+            loss = criterion(pred, y_batch.float())
             loss.backward()
-            optimizer.step()
             t_loss.append(loss.item())
-            print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
-        else:
-            # valid data
-            model.eval()
-            model.cpu()
-            y = torch.LongTensor(y.long())
-            y = one_hot(y, 16)
-            target = rearrange(y, 'b d w h c -> b c d w h')
-            # training param
-            output = model(data.float())
-            loss = criterion(output, target.float())
-            v_acc.append(np.mean(calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE, is_training=True)))
-            v_loss.append(loss.item())
-            print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
+            print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
+    model.eval()
+    for index, (data, y) in enumerate(valid_loader):
+        # valid data
+
+        model.cpu()
+        y = torch.LongTensor(y.long())
+        y = one_hot(y, 16)
+        target = rearrange(y, 'b d w h c -> b c d w h')
+        # training param
+        output = model(data.float())
+        loss = criterion(output, target.float())
+        v_acc.append(np.mean(
+            calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
+                          is_training=True)))
+        v_loss.append(loss.item())
+        print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
     # ----------------------------------------------------
     # 返回每一个epoch的mean_loss
     print()
@@ -108,18 +152,21 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
 
 
 def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load):
-    path = os.path.join('..', 'checkpoints', 'auto_save_task2')
-    train_valid_loader = task2_data_loader.get_dataloader(batch_size=batch_size)
+    path = os.path.join('..', 'checkpoints', 'auto_save_task2_sliding_window')
+    train_loader = task2_sliding_window.get_dataloader(batch_size=batch_size)
+    valid_loader = task2_sliding_window.get_valid_data()
+    train_valid_loader = [train_loader, valid_loader]
     train_loss = []
     valid_loss = []
     valid_acc = []
     # ----------------------------------------------------------------
     for epoch in range(1, n_epochs + 1):
         print('{} / {} epoch:'.format(epoch, n_epochs))
-        t_loss, v_loss, v_acc = train_and_valid_model(epoch=epoch, model=pre_train_model,
-                                               data_loader=train_valid_loader,
-                                               device=device, optimizer=optimizer, criterion=criterion)
-        # 每30次保存一次模型
+        t_loss, v_loss, v_acc = train_and_valid_model_slidingwindow(epoch=epoch, model=pre_train_model,
+                                                                    data_loader=train_valid_loader,
+                                                                    device=device, optimizer=optimizer,
+                                                                    criterion=criterion)
+        # 每20次保存一次模型
         if epoch % 20 == 0:
             torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch)))
         torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))

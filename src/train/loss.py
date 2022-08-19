@@ -90,14 +90,16 @@ class BCELoss_with_weight(nn.Module):
             exit()
         wei_sum = sum(self.weight)
         weight_loss = 0.
-        for i, class_weight in enumerate(self.weight):
-            pred_i = pred[:, i]
-            true_i = true[:, i]
-            weight_loss += (
+        batch_size = pred.shape[0]
+        for b in range(batch_size):
+            for i, class_weight in enumerate(self.weight):
+                pred_i = pred[:, i]
+                true_i = true[:, i]
+                weight_loss += (
                         class_weight / wei_sum * F.binary_cross_entropy(pred_i, true_i, reduction='mean'))
+        weight_loss / batch_size
         weight_loss.requires_grad_(True)
         return weight_loss
-
 
 # loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
 # bce = BCELoss_with_weight(weight=loss_weight)

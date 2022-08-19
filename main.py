@@ -57,7 +57,7 @@ if __name__ == '__main__':
     model.to(device)
     for x, y in data_loader:
         y = torch.LongTensor(y.long())
-        x, y = x.to(device), y.to(device)
+        # x, y = x.to(device), y.to(device)
         y = torch.nn.functional.one_hot(y, 16)
         y = einops.rearrange(y, 'b d w h c -> b c d w h')
         fun = sliding_3D_window
