@@ -74,6 +74,9 @@ class data_set(Dataset):
         if self.is_valid:
             x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
             y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        else:
+            x = resize(x, (x.shape[0], 256, 256), order=1, preserve_range=True, anti_aliasing=False)
+            y = resize(y, (y.shape[0], 256, 256), order=0, preserve_range=True, anti_aliasing=False)
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
         return x, y

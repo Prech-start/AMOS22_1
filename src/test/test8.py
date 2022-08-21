@@ -34,6 +34,31 @@ def sliding_3D_window2(image, window_size, step):
                 yield window
 
 
+def sliding_3D_window3(image, window_height, step):
+    # image.shape = b, c, d, w, h
+    # step must smaller than window_size
+    image = rearrange(image, ' b c d w h -> b c w h d')
+    _, _, width, height, depth = image.shape
+    # x_step, y_step, z_step = step
+    # step only for z axis
+    # x_window_size, y_window_size, z_window_size = window_size
+    for z in range(0, depth, step):
+        if window_height > depth:
+            # padding
+            gap = window_height - depth
+            top_pad = gap // 2
+            button_pad = gap - gap // 2
+            window = torch.nn.functional.pad(image, (top_pad, button_pad), mode='constant', value=0)
+            pass
+        elif z + window_height > depth:
+            window = image[..., -1 - window_height:-1]
+        else:
+            window = image[..., z:z + window_height]
+
+
+a = torch.empty((1, 1, 1, 1, 1))
+sliding_3D_window3(a, 4, 1)
+
 from tqdm import tqdm
 
 data_loader = get_dataloader()

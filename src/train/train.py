@@ -22,6 +22,7 @@ sys.path.append('..')
 from src.utils.accuracy import *
 import src.process.task2_data_loader as task2_data_loader
 import src.process.task2_sliding_window as task2_sliding_window
+import src.process.task2_sliding_window2 as loader
 import einops
 
 
@@ -50,6 +51,28 @@ def sliding_3D_window2(image, window_size, step):
                 # if window.shape[-1] == 16:
                 #     print(window.shape)
                 yield window
+
+
+def sliding_3D_window3(image, window_height, step):
+    # image.shape = b, c, d, w, h
+    # step must smaller than window_size
+    image = rearrange(image, ' b c d w h -> b c w h d')
+    _, _, width, height, depth = image.shape
+    # x_step, y_step, z_step = step
+    # step only for z axis
+    # x_window_size, y_window_size, z_window_size = window_size
+    for z in range(0, depth, step):
+        if window_height > depth:
+            # padding
+            gap = window_height - depth
+            top_pad = gap // 2
+            button_pad = gap - gap // 2
+            window = torch.nn.functional.pad(image, (top_pad, button_pad), mode='constant', value=0)
+        elif z + window_height > depth:
+            window = image[..., -1 - window_height:-1]
+        else:
+            window = image[..., z:z + window_height]
+        yield window
 
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
@@ -110,14 +133,14 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
         y = torch.LongTensor(y.long())
         y = torch.nn.functional.one_hot(y, 16)
         y = einops.rearrange(y, 'b d w h c -> b c d w h')
-        fun = sliding_3D_window2
-        for x_win, y_win in zip(fun(x, window_size=(128, 128, 64), step=(96, 96, 48)),
-                                fun(y, window_size=(128, 128, 64), step=(96, 96, 48))):
+        fun = sliding_3D_window3
+        for x_win, y_win in zip(fun(x, window_height=64, step=32),
+                                fun(y, window_height=64, step=32)):
             # x_batch = x[..., x_win[2]:x_win[3], x_win[4]:x_win[5], x_win[0]:x_win[1]]
             # y_batch = y[..., y_win[2]:y_win[3], y_win[4]:y_win[5], y_win[0]:y_win[1]]
             optimizer.zero_grad()
             x_batch, y_batch = x_win, y_win
-            if x_batch.shape != (1, 1, 128, 128, 64):
+            if x_batch.shape != (1, 1, 256, 256, 64):
                 continue
             x_batch = x_batch.to(device)
             y_batch = y_batch.to(device)
@@ -153,8 +176,8 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
 
 def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load):
     path = os.path.join('..', 'checkpoints', 'auto_save_task2_sliding_window')
-    train_loader = task2_sliding_window.get_dataloader(batch_size=batch_size)
-    valid_loader = task2_sliding_window.get_valid_data()
+    train_loader = loader.get_dataloader(batch_size=batch_size)
+    valid_loader = loader.get_valid_data()
     train_valid_loader = [train_loader, valid_loader]
     train_loss = []
     valid_loss = []
