@@ -144,7 +144,7 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
             calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
                           is_training=True)))
         v_loss.append(loss.item())
-        print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(data_loader), loss.item()), end="")
+        print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(valid_loader), loss.item()), end="")
     # ----------------------------------------------------
     # 返回每一个epoch的mean_loss
     print()
