@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 import skimage
 
 
-def a(images, outputs):
+def overlap(images, outputs):
     images_ori = images.data.squeeze().cpu().numpy()
     images_ori = np.expand_dims(images_ori, axis=-1)
     images_ori = array_to_img(images_ori)
@@ -137,16 +137,8 @@ def concat_image(ORI, GT, PRED, save_path='', no=0, slices=1.0 / 3):
         G T shape = b,c,d,w,h
         PRED shape = b,c,d,w,h
     '''
-    # # 删除为一的维度 batchsize，channel
-    # ORI = ORI.data.squeeze().cpu().numpy()
-    # GT = GT.data.squeeze().cpu().numpy()
-    # PRED = PRED.data.squeeze().cpu().numpy()
-    # # 将d维度转移到最后一维
-    # ORI = np.expand_dims(ORI[int(ORI.shape[0] * slices), :, :], -1)
-    # GT = np.expand_dims(GT[int(GT.shape[0] * slices), :, :], -1)
-    # PRED = np.expand_dims(PRED[int(PRED.shape[0] * slices), :, :], -1)
-    # # 将ORI,GT,PRED转化为PIL的image
-    # Image.fromarray(img_show[:, :, 0].astype('uint8'), 'P')
+    HEIGHT = ORI.shape[-1]
+    WIDTH = ORI.shape[-2]
     ORI = trans_image(ORI, slices=slices, mode='L')
     GT = trans_image(GT, slices=slices, mode='P')
     PRED = trans_image(PRED, slices=slices, mode='P')
@@ -184,6 +176,7 @@ def norm(x):
     x = x / 2048
     return x
 
+
 # a = np.ones(shape=(1, 1, 56, 224, 224))
 # b = np.zeros(shape=(1, 1, 56, 224, 224))
 # a = torch.Tensor(a)
@@ -209,3 +202,13 @@ import SimpleITK as sitk
 # result_image = sitk.GetImageFromArray(pred_array)
 # result_image.CopyInformation(ori_image)
 # sitk.WriteImage(result_image, '0573.nii.gz')
+from src.process.task2_sliding_window2 import train_path
+
+for p_ in train_path:
+    x_path, y_path = p_
+    x_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(x_path)).astype(np.int16))
+    y_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(y_path)).astype(np.int16))
+    x_tensor = torch.from_numpy(x_array).type(torch.FloatTensor)
+    y_tensor = torch.from_numpy(y_array).type(torch.FloatTensor)
+    concat_image(x_tensor, y_tensor, y_tensor)
+    pass
