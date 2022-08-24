@@ -13,12 +13,12 @@ from torch.utils.data import DataLoader
 import skimage
 
 
-def overlap(images, outputs):
-    images_ori = images.data.squeeze().cpu().numpy()
+def overlap(images, outputs, slice=1 / 3):
+    images_ori = images.data.squeeze().cpu().numpy()[images.shape[-3] * slice, ...]
     images_ori = np.expand_dims(images_ori, axis=-1)
     images_ori = array_to_img(images_ori)
     images_ori = images_ori.convert("RGB")
-    image_mask = outputs[0].data.squeeze().cpu().numpy()
+    image_mask = outputs.data.squeeze().cpu().numpy()[outputs.shape[-3] * slice, ...]
     image_mask = Image.fromarray(image_mask.astype('uint8'), 'P')
     palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51, 255,
                    102, 153, 51, 102, 102, 51, 153, 255, 20, 20, 20, 255, 255, 194, 10, 255, 51, 51, 153, 255, 255, 61,
@@ -210,5 +210,6 @@ for p_ in train_path:
     y_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(y_path)).astype(np.int16))
     x_tensor = torch.from_numpy(x_array).type(torch.FloatTensor)
     y_tensor = torch.from_numpy(y_array).type(torch.FloatTensor)
-    concat_image(x_tensor, y_tensor, y_tensor)
+    # concat_image(x_tensor, y_tensor, y_tensor)
+    overlap(x_tensor, y_tensor)
     pass
