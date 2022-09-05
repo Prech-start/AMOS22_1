@@ -31,6 +31,7 @@ from src.process.task2_sliding_window import get_dataloader, sliding_3D_window
 
 
 if __name__ == '__main__':
+    print('a')
     class_num = 16
     learning_rate = 1e-4
     epoch = 300
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     loss = BCELoss_with_weight(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # TODO: loss = nn.BCELoss()
+    print('beginning training')
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
                   device=torch.device('cuda'), is_load=is_load)
 

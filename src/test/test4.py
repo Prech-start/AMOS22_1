@@ -1,6 +1,8 @@
 from src.utils.image_process import *
 from src.model.model import *
 from src.process.task2_data_loader import get_dataloader
+from src.process.task2_sliding_window2 import get_dataloader
+
 # 把dataset放到DataLoader中
 test_loader = get_dataloader(False)
 model = UnetModel(1, 16, 6)
@@ -29,6 +31,21 @@ def show_result(model):
             result = result.data.squeeze().cpu().numpy()
             save_image_information(index, result)
             pass
+
+
+def show_result():
+    # load data
+    origin_image_path = '../utils/amos_0008.nii.gz'
+    label_image_path = '../utils/amos_0008I.nii.gz'
+    origin_image = sitk.GetArrayFromImage(sitk.ReadImage(origin_image_path))
+    label_image = sitk.GetArrayFromImage(sitk.ReadImage(label_image_path))
+    # origin image to [0,1] and mul 255
+    origin_image = norm(origin_image) * 255
+    # label image [0,15] with integer number
+
+    # show_two
+    pass
+
 
 for i, j in test_loader:
     k = model(i.float())

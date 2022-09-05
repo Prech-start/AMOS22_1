@@ -160,6 +160,8 @@ def calculate_acc(output, target, class_num, fun, is_training=False):
     # return: 每一个通道所计算出来的指标的值
     # 将每一个通道都做一次acc计算
     acc = []
+    if len(torch.unique(output)) != len(torch.unique(target)):
+        print('error')
     # HD_95计算库的dtype为np.numeric
     dtype_ = bool
     for i in range(class_num):

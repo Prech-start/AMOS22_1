@@ -134,8 +134,8 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
         y = torch.nn.functional.one_hot(y, 16)
         y = einops.rearrange(y, 'b d w h c -> b c d w h')
         fun = sliding_3D_window3
-        for x_win, y_win in zip(fun(x, window_height=64, step=32),
-                                fun(y, window_height=64, step=32)):
+        for x_win, y_win in zip(fun(x, window_height=64, step=48),
+                                fun(y, window_height=64, step=48)):
             # x_batch = x[..., x_win[2]:x_win[3], x_win[4]:x_win[5], x_win[0]:x_win[1]]
             # y_batch = y[..., y_win[2]:y_win[3], y_win[4]:y_win[5], y_win[0]:y_win[1]]
             optimizer.zero_grad()
@@ -150,6 +150,7 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
             pred = model(x_batch)
             loss = criterion(pred, y_batch.float())
             loss.backward()
+            optimizer.step()
             t_loss.append(loss.item())
             print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
     model.eval()
@@ -223,6 +224,7 @@ def show_result(model):
 
 
 if __name__ == '__main__':
+    print('beginning training')
     class_num = 16
     learning_rate = 1e-4
     epoch = 300

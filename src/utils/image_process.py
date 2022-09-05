@@ -13,6 +13,51 @@ from torch.utils.data import DataLoader
 import skimage
 
 
+def norm(x):
+    if np.min(x) < 0:
+        # CT 图像处理
+        x = x + 1024.0
+        x = np.clip(x, a_min=0, a_max=2048.0)
+        x = x / 2048.0
+    else:
+        # MRI 图像处理
+        x = (x - np.min(x)) / (np.max(x) - np.min(x))
+    return x
+
+
+def trans_3d_2_mp4(image_array, result_array):
+    image_array = image_array.data.squeeze().cpu().numpy()
+    result_array = result_array.data.squeeze().cpu().numpy()
+    image_array = norm(image_array) * 255
+    depth, height, width = image_array.shape
+    palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51, 255,
+                   102, 153, 51, 102, 102, 51, 153, 255, 20, 20, 20, 255, 255, 194, 10, 255, 51, 51, 153, 255, 255, 61,
+                   255, 0, 128]
+    tar_images = []
+    for d in range(depth):
+        image_fps, result_fps = image_array[d], result_array[d]
+        image_fps = Image.fromarray(image_fps.astype('uint8'), 'L').convert('RGB')
+        result_fps = Image.fromarray(result_fps.astype('uint8'), 'P')
+        result_fps.putpalette(palettedata)
+        result_fps = result_fps.convert('RGB')
+        tar_images.append(Image.blend(image_fps, result_fps, 0.3))
+
+    tar_images[0].save('array.gif', save_all=True, append_images=tar_images[1:], duration=200, loop=1)
+    import moviepy.editor as mp
+    temp = mp.VideoFileClip('array.gif')
+    temp.write_videofile('result.mp4')
+    os.remove('array.gif')
+
+
+origin_image_path = '../utils/amos_0008.nii.gz'
+label_image_path = '../utils/amos_0008I.nii.gz'
+image = np.array(sitk.GetArrayFromImage(sitk.ReadImage(origin_image_path)).astype(np.int16))
+label = np.array(sitk.GetArrayFromImage(sitk.ReadImage(label_image_path)).astype(np.int8))
+image = torch.from_numpy(image).type(torch.FloatTensor)
+label = torch.from_numpy(label).type(torch.FloatTensor)
+trans_3d_2_mp4(image, label)
+
+
 def overlap(images, outputs, slice=1 / 3):
     images_ori = images.data.squeeze().cpu().numpy()[images.shape[-3] * slice, ...]
     images_ori = np.expand_dims(images_ori, axis=-1)
@@ -170,13 +215,6 @@ def trans_image(x, slices, mode="P"):
     return x
 
 
-def norm(x):
-    x = x + 1024.0
-    x = np.clip(x, a_min=0, a_max=2048.0)
-    x = x / 2048
-    return x
-
-
 # a = np.ones(shape=(1, 1, 56, 224, 224))
 # b = np.zeros(shape=(1, 1, 56, 224, 224))
 # a = torch.Tensor(a)
@@ -204,12 +242,12 @@ import SimpleITK as sitk
 # sitk.WriteImage(result_image, '0573.nii.gz')
 from src.process.task2_sliding_window2 import train_path
 
-for p_ in train_path:
-    x_path, y_path = p_
-    x_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(x_path)).astype(np.int16))
-    y_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(y_path)).astype(np.int16))
-    x_tensor = torch.from_numpy(x_array).type(torch.FloatTensor)
-    y_tensor = torch.from_numpy(y_array).type(torch.FloatTensor)
-    # concat_image(x_tensor, y_tensor, y_tensor)
-    overlap(x_tensor, y_tensor)
-    pass
+# for p_ in train_path:
+#     x_path, y_path = p_
+#     x_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(x_path)).astype(np.int16))
+#     y_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(y_path)).astype(np.int16))
+#     x_tensor = torch.from_numpy(x_array).type(torch.FloatTensor)
+#     y_tensor = torch.from_numpy(y_array).type(torch.FloatTensor)
+#     # concat_image(x_tensor, y_tensor, y_tensor)
+#     overlap(x_tensor, y_tensor)
+#     pass

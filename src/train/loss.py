@@ -50,10 +50,10 @@ class Generalized_Dice_loss(nn.Module):
     #     '''
     #     step1: calculate the dice of each category
     #     step2: remove the dice of the empty category and background, and then calculate the mean of the remaining dices.
-    #     :param prediction: the automated segmentation result, a numpy array with shape of (h, w, d)
-    #     :param target: the ground truth mask, a numpy array with shape of (h, w, d)
-    #     :param class_num: total number of categories
-    #     :return:
+    #       :param: prediction: the automated segmentation result, a numpy array with shape of (h, w, d)
+    #       :param: target: the ground truth mask, a numpy array with shape of (h, w, d)
+    #       :param: class_num: total number of categories
+    #       :return:
     #     '''
     #     eps = 1e-10
     #     empty_value = -1.0
@@ -101,6 +101,7 @@ class BCELoss_with_weight(nn.Module):
         weight_loss.requires_grad_(True)
         return weight_loss
 
+
 # loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
 # bce = BCELoss_with_weight(weight=loss_weight)
 # a = torch.FloatTensor(np.ones(shape=[1, 16, 50, 50, 50]))
@@ -108,3 +109,30 @@ class BCELoss_with_weight(nn.Module):
 # k = bce(a, b)
 # k.backward()
 # print(k.item())
+from src.model.model import *
+from torch.nn.functional import one_hot
+import os
+import src.process.task2_sliding_window2 as loader
+from einops import rearrange
+from src.utils.accuracy import calculate_acc, DICE
+
+valid_loader = loader.get_valid_data()
+class_num = 16
+model = UnetModel(1, class_num, 6)
+model.load_state_dict(
+    torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_sliding_window', 'Unet-40.pth')))
+v_acc = []
+for index, (data, y) in enumerate(valid_loader):
+    # valid data
+
+    model.cpu()
+    y = torch.LongTensor(y.long())
+    y = one_hot(y, 16)
+    target = rearrange(y, 'b d w h c -> b c d w h')
+    # training param
+    output = model(data.float())
+    print('process {}'.format(index))
+    v_acc.append(np.mean(
+        calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
+                      is_training=True)))
+print(np.mean(v_acc))

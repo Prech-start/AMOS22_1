@@ -113,6 +113,6 @@ def get_valid_data():
         batch_size=1,
         shuffle=False
     )
-a = get_dataloader()
-for i in a:
-    print()
+# a = get_dataloader()
+# for i in a:
+#     print()
