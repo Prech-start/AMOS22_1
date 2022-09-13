@@ -1,4 +1,6 @@
 import copy
+
+import torch
 from torch.nn.functional import one_hot
 # from torch.utils.data import DataLoader
 from scipy.optimize import linear_sum_assignment
@@ -6,7 +8,7 @@ from src.process.data_load import *
 from src.model.model import *
 import surface_distance
 from medpy.metric import binary
-
+import numpy as np
 
 def DICE(output, target):  # output为预测结果 target为真实结果
     smooth = 1e-5  # 防止0除
@@ -129,31 +131,6 @@ def Sensitivity(output, target):
            (target.sum() + smooth)
 
 
-# def calculate_acc(output, target, class_num, fun):
-#     # input: class_tensor
-#     # output shape b c w h d
-#     # return:
-#     # 将每一个通道都做一次acc计算
-#     acc = []
-#     for i in range(class_num):
-#         pred = copy.deepcopy(output)
-#         true = copy.deepcopy(target)
-#         # pred[pred != i] = 0
-#         # true[true != i] = 0
-#         if fun != ASD:
-#             pred = one_hot(torch.LongTensor(pred), 16)
-#             true = one_hot(torch.LongTensor(true), 16)
-#             pred = rearrange(pred, 'b w h d c -> b c w h d')
-#             true = rearrange(true, 'b w h d c -> b c w h d')
-#         else:
-#             pred = np.squeeze((pred == i), axis=0)
-#             true = np.squeeze((true == i).numpy(), axis=0)
-#         acc.append(fun(pred, true))
-#
-#     # acc.append(output, target)
-#     return acc
-
-
 def calculate_acc(output, target, class_num, fun, is_training=False):
     # input: class_tensor
     # output, target's shape b c w h d
@@ -183,109 +160,127 @@ def calculate_acc(output, target, class_num, fun, is_training=False):
     return acc
 
 
+def calculate_dice_all(test_loader, model):
+    from einops import rearrange
+    model.cpu()
+    dice = []
+    class_num = 16
+    dtype_ = bool
+
+    with torch.no_grad():
+        for x, y in test_loader:
+            acc = []
+            target = torch.LongTensor(y.long())
+            output = model(x.float())
+            output = torch.argmax(output, 1)
+            pred = copy.deepcopy(output.data.squeeze().numpy())
+            true = copy.deepcopy(target.data.squeeze().numpy())
+            pred = one_hot(torch.LongTensor(pred), 16).numpy().astype(dtype_)
+            true = one_hot(torch.LongTensor(true), 16).numpy().astype(dtype_)
+            uni_list = torch.unique(target)
+            all_list = [i for i in range(16)]
+            for i in range(class_num):
+                # 跳过background
+                if i == 0:
+                    continue
+                if i not in uni_list and i in all_list:
+                    temp = -1
+                else:
+                    temp = DICE(pred[..., i], true[..., i])
+                acc.append(temp)
+            pred = output.data.squeeze().numpy().astype(bool)
+            true = target.data.squeeze().numpy().astype(bool)
+            acc.append(DICE(pred, true))
+            dice.append(acc)
+    return np.array(dice)
+
+
 from tqdm import tqdm
 import pandas as pd
 from src.process.task2_data_loader import get_dataloader
 
-if __name__ == '__main__':
-    data_loader = get_dataloader(is_train=False, batch_size=1)
-    dict_ = {
-        # "0": "background",
-        "1": "spleen",
-        "2": "right kidney",
-        "3": "left kidney",
-        "4": "gall bladder",
-        "5": "esophagus",
-        "6": "liver",
-        "7": "stomach",
-        "8": "aorta",
-        "9": "postcava",
-        "10": "pancreas",
-        "11": "right adrenal gland",
-        "12": "left adrenal gland",
-        "13": "duodenum",
-        "14": "bladder",
-        "15": "prostate/uterus",
-        "16": "total"
-    }
-    model = UnetModel(1, 16, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-240.pth')))
-    dice_acc = []
-    asd_acc = []
-    hd_acc = []
-    sen_acc = []
-    acc = []
-    error_num = 0
-    with torch.no_grad():
-        model.eval()
-    for x, y in data_loader:
-        x = x.cpu().float()
-        true = y.cpu().float()
-        pred = model(x)
-        pred = torch.argmax(pred, dim=1)
-        print(torch.unique(pred))
-        if np.unique(pred).tolist() == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15]:
-            error_num += 1
-            continue
-        if len(np.unique(true)) != 16:
-            error_num += 1
-            continue
-        if len(np.unique(pred)) != 16:
-            error_num += 1
-            continue
-        # # ok
-        asd_acc.append(calculate_acc(output=true, target=pred, class_num=16, fun=ASD))
-        # # ok
-        dice_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=DICE))
-        # ok
-        hd_acc.append(calculate_acc(output=true, target=pred, class_num=16, fun=HD_95))
-        # ok
-        sen_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=Sensitivity))
-    # 将每一个指标存进execl
-    asd_acc = np.array(asd_acc)
-    dice_acc = np.array(dice_acc)
-    hd_acc = np.array(hd_acc)
-    sen_acc = np.array(sen_acc)
-    acc_matrix = [dice_acc, asd_acc[:, :, 0], asd_acc[:, :, 1], hd_acc, sen_acc]
-    # acc_matrix.shape = acc_num, item_num, class_num
-    acc_matrix = np.array(acc_matrix).mean(axis=1).T
-    data_matrix = pd.DataFrame(acc_matrix)
-    data_matrix.columns = ['DICE', 'ASD_GT2PRED', 'ASD_PRED2GT', 'HD_95', 'SENSITIVITY']
-    data_matrix.index = dict_.values()
-    writer = pd.ExcelWriter('accuracy_weight_task2_240.xlsx')
-    data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
-    writer.save()
-    print('error number:{}/{}'.format(error_num, len(data_loader)))
-    print('done')
-    # x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
-    # calculate_acc2(x, x, 16, DICE)
+model = UnetModel(1, 16, 6)
+model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
 
-# dict_ = {
-#     "0": "background",
-#     "1": "spleen",
-#     "2": "right kidney",
-#     "3": "left kidney",
-#     "4": "gall bladder",
-#     "5": "esophagus",
-#     "6": "liver",
-#     "7": "stomach",
-#     "8": "arota",
-#     "9": "postcava",
-#     "10": "pancreas",
-#     "11": "right adrenal gland",
-#     "12": "left adrenal gland",
-#     "13": "duodenum",
-#     "14": "bladder",
-#     "15": "prostate/uterus"
-# }
-# am = np.array(np.ones(shape=[5, 4, 16])).mean(axis=1)
-# acc_matrix = np.array(am).T
-# data_matrix = pd.DataFrame(acc_matrix)
-# data_matrix.columns = ['DICE', 'ASD_GT2PRED', 'ASD_PRED2GT', 'HD_95', 'SENSITIVITY']
-# data_matrix.index = dict_.values()
-# writer = pd.ExcelWriter('accuracy.xlsx')
-# data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
-# writer.save()
-# print('done')
-# x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
-# calculate_acc2(x, x, 16, DICE)
+acc = calculate_dice_all(get_dataloader(False), model)
+dices = []
+for n_class in range(0, 16):
+    c_dices = acc[..., n_class]
+    c_dice = np.mean(c_dices[np.where(c_dices != -1)])
+    dices.append(c_dice)
+dices = np.array(dices)
+print(dices)
+
+#
+# if __name__ == '__main__':
+#     data_loader = get_dataloader(is_train=False, batch_size=1)
+#     dict_ = {
+#         # "0": "background",
+#         "1": "spleen",
+#         "2": "right kidney",
+#         "3": "left kidney",
+#         "4": "gall bladder",
+#         "5": "esophagus",
+#         "6": "liver",
+#         "7": "stomach",
+#         "8": "aorta",
+#         "9": "postcava",
+#         "10": "pancreas",
+#         "11": "right adrenal gland",
+#         "12": "left adrenal gland",
+#         "13": "duodenum",
+#         "14": "bladder",
+#         "15": "prostate/uterus",
+#         "16": "total"
+#     }
+#     model = UnetModel(1, 16, 6)
+#     model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-240.pth')))
+#     dice_acc = []
+#     asd_acc = []
+#     hd_acc = []
+#     sen_acc = []
+#     acc = []
+#     error_num = 0
+#     with torch.no_grad():
+#         model.eval()
+#     for x, y in data_loader:
+#         x = x.cpu().float()
+#         true = y.cpu().float()
+#         pred = model(x)
+#         pred = torch.argmax(pred, dim=1)
+#         print(torch.unique(pred))
+#         if np.unique(pred).tolist() == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15]:
+#             error_num += 1
+#             continue
+#         if len(np.unique(true)) != 16:
+#             error_num += 1
+#             continue
+#         if len(np.unique(pred)) != 16:
+#             error_num += 1
+#             continue
+#         # # ok
+#         asd_acc.append(calculate_acc(output=true, target=pred, class_num=16, fun=ASD))
+#         # # ok
+#         dice_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=DICE))
+#         # ok
+#         hd_acc.append(calculate_acc(output=true, target=pred, class_num=16, fun=HD_95))
+#         # ok
+#         sen_acc.append(calculate_acc(output=pred, target=true, class_num=16, fun=Sensitivity))
+#     # 将每一个指标存进execl
+#     asd_acc = np.array(asd_acc)
+#     dice_acc = np.array(dice_acc)
+#     hd_acc = np.array(hd_acc)
+#     sen_acc = np.array(sen_acc)
+#     acc_matrix = [dice_acc, asd_acc[:, :, 0], asd_acc[:, :, 1], hd_acc, sen_acc]
+#     # acc_matrix.shape = acc_num, item_num, class_num
+#     acc_matrix = np.array(acc_matrix).mean(axis=1).T
+#     data_matrix = pd.DataFrame(acc_matrix)
+#     data_matrix.columns = ['DICE', 'ASD_GT2PRED', 'ASD_PRED2GT', 'HD_95', 'SENSITIVITY']
+#     data_matrix.index = dict_.values()
+#     writer = pd.ExcelWriter('accuracy_weight_task2_240.xlsx')
+#     data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
+#     writer.save()
+#     print('error number:{}/{}'.format(error_num, len(data_loader)))
+#     print('done')
+#     # x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
+#     # calculate_acc2(x, x, 16, DICE)

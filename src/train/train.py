@@ -149,6 +149,7 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
             # print(y_batch.shape)
             pred = model(x_batch)
             loss = criterion(pred, y_batch.float())
+            optimizer.step()
             loss.backward()
             optimizer.step()
             t_loss.append(loss.item())
@@ -156,7 +157,6 @@ def train_and_valid_model_slidingwindow(epoch, model, data_loader, device, optim
     model.eval()
     for index, (data, y) in enumerate(valid_loader):
         # valid data
-
         model.cpu()
         y = torch.LongTensor(y.long())
         y = one_hot(y, 16)

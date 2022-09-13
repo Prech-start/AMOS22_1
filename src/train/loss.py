@@ -97,7 +97,7 @@ class BCELoss_with_weight(nn.Module):
                 true_i = true[:, i]
                 weight_loss += (
                         class_weight / wei_sum * F.binary_cross_entropy(pred_i, true_i, reduction='mean'))
-        weight_loss / batch_size
+        weight_loss = weight_loss / batch_size
         weight_loss.requires_grad_(True)
         return weight_loss
 
