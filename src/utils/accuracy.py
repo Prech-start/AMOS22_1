@@ -10,6 +10,7 @@ import surface_distance
 from medpy.metric import binary
 import numpy as np
 
+
 def DICE(output, target):  # output为预测结果 target为真实结果
     smooth = 1e-5  # 防止0除
 
@@ -168,7 +169,7 @@ def calculate_dice_all(test_loader, model):
     dtype_ = bool
 
     with torch.no_grad():
-        for x, y in test_loader:
+        for x, y in tqdm(test_loader):
             acc = []
             target = torch.LongTensor(y.long())
             output = model(x.float())
@@ -195,23 +196,61 @@ def calculate_dice_all(test_loader, model):
     return np.array(dice)
 
 
+def cal_nnunet_dice():
+    from glob import glob
+    dice = []
+    class_num = 16
+    dtype_ = bool
+    infer_path = "/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task051_AMOS/inferTs/*"  # 推理结果地址
+    label_path = "/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task051_AMOS/imagesTl/*"  # 测试集label地址
+    infer = sorted(glob(infer_path))[:-1]
+    label = sorted(glob(label_path))
+    score_avg = 0
+    for i in range(len(label)):
+        acc = []
+        inf, lab = infer[i], label[i]
+        inf, lab = sitk.ReadImage(inf, sitk.sitkFloat32), sitk.ReadImage(lab, sitk.sitkFloat32)
+        inf, lab = sitk.GetArrayFromImage(inf).astype(np.long), sitk.GetArrayFromImage(lab).astype(np.long)
+        inf, lab = torch.from_numpy(inf), torch.from_numpy(lab)
+        output, target = inf.unsqueeze(0).unsqueeze(0), lab.unsqueeze(0).unsqueeze(0)
+        pred = one_hot(torch.LongTensor(output), 16).numpy().astype(dtype_)
+        true = one_hot(torch.LongTensor(target), 16).numpy().astype(dtype_)
+        uni_list = torch.unique(target)
+        all_list = [i for i in range(16)]
+        for i in range(class_num):
+            # 跳过background
+            if i == 0:
+                continue
+            if i not in uni_list and i in all_list:
+                temp = -1
+            else:
+                temp = DICE(pred[..., i], true[..., i])
+            acc.append(temp)
+        pred = output.data.squeeze().numpy().astype(bool)
+        true = target.data.squeeze().numpy().astype(bool)
+        acc.append(DICE(pred, true))
+        dice.append(acc)
+    return np.array(dice)
+
+
+
+
 from tqdm import tqdm
 import pandas as pd
 from src.process.task2_data_loader import get_dataloader
-
-model = UnetModel(1, 16, 6)
-model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
-
-acc = calculate_dice_all(get_dataloader(False), model)
-dices = []
-for n_class in range(0, 16):
-    c_dices = acc[..., n_class]
-    c_dice = np.mean(c_dices[np.where(c_dices != -1)])
-    dices.append(c_dice)
-dices = np.array(dices)
-print(dices)
-
 #
+# model = UnetModel(1, 16, 6)
+# model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-180.pth')))
+#
+# acc = calculate_dice_all(get_dataloader(False), model)
+# dices = []
+# for n_class in range(0, 16):
+#     c_dices = acc[..., n_class]
+#     c_dice = np.mean(c_dices[np.where(c_dices != -1)])
+#     dices.append(c_dice)
+# dices = np.array(dices)
+# print(dices)
+
 # if __name__ == '__main__':
 #     data_loader = get_dataloader(is_train=False, batch_size=1)
 #     dict_ = {
@@ -284,3 +323,51 @@ print(dices)
 #     print('done')
 #     # x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
 #     # calculate_acc2(x, x, 16, DICE)
+if __name__ == '__main__':
+    data_loader = get_dataloader(is_train=False, batch_size=1)
+    dict_ = {
+        # "0": "background",
+        "1": "spleen",
+        "2": "right kidney",
+        "3": "left kidney",
+        "4": "gall bladder",
+        "5": "esophagus",
+        "6": "liver",
+        "7": "stomach",
+        "8": "aorta",
+        "9": "postcava",
+        "10": "pancreas",
+        "11": "right adrenal gland",
+        "12": "left adrenal gland",
+        "13": "duodenum",
+        "14": "bladder",
+        "15": "prostate/uterus",
+        "16": "total"
+    }
+    model = UnetModel(1, 16, 6)
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-220.pth')))
+
+    acc_nnunet = cal_nnunet_dice()
+    acc = calculate_dice_all(get_dataloader(False), model)
+    dices = []
+    dices_nnunet = []
+    for n_class in range(0, 16):
+        c_dices = acc[..., n_class]
+        c_dices_nnunet = acc_nnunet[..., n_class]
+        c_dice = np.mean(c_dices[np.where(c_dices != -1)])
+        c_dice_nnunet = np.mean(c_dices_nnunet[np.where(c_dices_nnunet != -1)])
+        dices.append(c_dice)
+        dices_nnunet.append(c_dice_nnunet)
+    dices = np.array(dices)
+    dices_nnunet = np.array(dices_nnunet)
+    # 将每一个指标存进execl
+    acc_matrix = [dices, dices_nnunet]
+    # acc_matrix.shape = acc_num, item_num, class_num
+    acc_matrix = np.array(acc_matrix).T
+    data_matrix = pd.DataFrame(acc_matrix)
+    data_matrix.columns = ['DICE', 'DICE_nnunet']
+    data_matrix.index = dict_.values()
+    writer = pd.ExcelWriter('accuracy_weight_task2_220_dice.xlsx')
+    data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
+    writer.save()
+    print('done')

@@ -6,8 +6,8 @@ path_dir = os.path.dirname(__file__)
 
 task2_json = json.load(open(os.path.join(path_dir, '..', '..', 'data', 'AMOS22', 'task2_dataset.json')))
 
-file_path = [[os.path.join('/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22', path_['image']),
-              os.path.join('/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22', path_['label'])]
+file_path = [[os.path.join('/home/ljc/code/AMOS22/data/AMOS22', path_['image']),
+              os.path.join('/home/ljc/code/AMOS22/data/AMOS22', path_['label'])]
              for path_ in task2_json['training']]
 
 CT_train_path = file_path[0:150]
@@ -99,22 +99,24 @@ def generate_dataset_json(output_file: str, imagesTr_dir: str, imagesTs_dir: str
 
 
 if __name__ == "__main__":
-    # 自行修改文件路径，当前在windows环境下操作
-    output_file = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/'
-    imagesTr_dir = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/imagesTr'
-    imagesTs_dir = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/imagesTs'
-    labelsTr = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/labelsTr'
-
-    # 只需要给出空定义，具体内容在上面的函数中修改
-    modalities = ''
-    labels = {
-
-    }
-    get_identifiers_from_splitted_files(output_file)
-    generate_dataset_json(output_file,
-                          imagesTr_dir,
-                          imagesTs_dir,
-                          labelsTr,
-                          modalities,
-                          labels
-                          )
+    for _, p in test_path:
+        move(p, '/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task51_AMOS/imagesTl/')
+# # 自行修改文件路径，当前在windows环境下操作
+# output_file = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/'
+# imagesTr_dir = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/imagesTr'
+# imagesTs_dir = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/imagesTs'
+# labelsTr = r'/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task01_AMOSS22/labelsTr'
+#
+# # 只需要给出空定义，具体内容在上面的函数中修改
+# modalities = ''
+# labels = {
+#
+# }
+# get_identifiers_from_splitted_files(output_file)
+# generate_dataset_json(output_file,
+#                       imagesTr_dir,
+#                       imagesTs_dir,
+#                       labelsTr,
+#                       modalities,
+#                       labels
+#                       )
