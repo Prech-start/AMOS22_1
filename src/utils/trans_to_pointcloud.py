@@ -8,12 +8,14 @@
 # Description：
 """
 import copy
+import os.path
 
 import numpy as np
 import time
 import torch
 import SimpleITK as sitk
 from src.process.task2_sliding_window2 import file_path
+
 
 def read_nii(ori_file_path):
     return np.array(sitk.GetArrayFromImage(sitk.ReadImage(ori_file_path))).astype(np.int16)
@@ -37,18 +39,21 @@ def process_3d_2_pc(ori_file_path, label_file_path):
 def cal_centre_point(ori_file_path, label_file_path):
     import torch.nn.functional as f
     start_time = time.time()
-    file_name = ori_file_path.split('/')[-1].split('.')[0]
-    # ori_arr = read_nii(ori_file_path)
-    label_arr = read_nii(label_file_path)
-    centre_arr = np.zeros_like(label_arr)
-    # label_arr = f.one_hot(torch.LongTensor(label_arr), 16)
-    for i in np.unique(label_arr).tolist():
-        if i == 0:
-            continue
-        x, y, z = np.mean(np.array(np.where(label_arr == i)), 1, dtype=int)
-        centre_arr[x, y, z] = i
-    np.save('/home/ljc/code/AMOS22/data/pointcloud/{}'.format(file_name), centre_arr)
+    file_name = label_file_path.split('/')[-1].split('.')[0]
+    save_path = '/home/ljc/code/AMOS22/data/pointcloud/{}'.format(file_name)
+    if not os.path.exists(save_path):
+        label_arr = read_nii(label_file_path)
+        centre_arr = np.zeros_like(label_arr)
+        for i in np.unique(label_arr).tolist():
+            if i == 0:
+                continue
+            x, y, z = np.mean(np.array(np.where(label_arr == i)), 1, dtype=int)
+            centre_arr[x, y, z] = i
+        np.save(save_path, centre_arr)
+        print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
+        return centre_arr
     print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
+    return np.load(save_path).astype(np.int8)
 
 
 if __name__ == '__main__':
