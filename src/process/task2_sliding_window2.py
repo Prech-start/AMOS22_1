@@ -69,7 +69,7 @@ class data_set(Dataset):
         y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
-        x = self.norm(x)
+        x = self.test_norm(x)
         # 使用slidingwindow 不使用resize
         if self.is_valid:
             x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
@@ -95,13 +95,23 @@ class data_set(Dataset):
             x = (x - np.min(x)) / (np.max(x) - np.min(x))
         return x
 
+    def test_norm(self, x):
+        if np.min(x) < 0:
+            # CT 图像处理
+            x = np.clip(x, a_min=-175, a_max=250)
+            x = (x + 175) / 425
+        else:
+            # MRI 图像处理
+            x = (x - np.min(x)) / (np.max(x) - np.min(x))
+        return x
+
 
 def collate_fun():
     pass
 
 
 def get_dataloader(is_train=True, batch_size=1):
-    data = data_set(train_path if is_train else test_path)
+    data = data_set(train_path if is_train else valid_path)
     return DataLoader(
         dataset=data,
         batch_size=batch_size,
@@ -109,8 +119,8 @@ def get_dataloader(is_train=True, batch_size=1):
     )
 
 
-def get_valid_data():
-    data = data_set(valid_path, is_valid=True)
+def get_test_data():
+    data = data_set(test_path, is_valid=True)
     return DataLoader(
         dataset=data,
         batch_size=1,

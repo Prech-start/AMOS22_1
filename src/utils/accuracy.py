@@ -237,7 +237,7 @@ def cal_nnunet_dice():
 
 from tqdm import tqdm
 import pandas as pd
-from src.process.task2_data_loader import get_dataloader
+from src.process.task2_data_loader import get_train_or_test_data as get_dataloader
 #
 # model = UnetModel(1, 16, 6)
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-180.pth')))

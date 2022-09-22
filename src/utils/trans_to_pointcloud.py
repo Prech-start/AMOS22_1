@@ -56,6 +56,24 @@ def cal_centre_point(ori_file_path, label_file_path):
     return np.load(save_path).astype(np.int8)
 
 
+def cal_centre_point_2(label_arr, label_file_path):
+    start_time = time.time()
+    file_name = label_file_path.split('/')[-1].split('.')[0]
+    save_path = '/home/ljc/code/AMOS22/data/pointcloud/{}'.format(file_name)
+    if not os.path.exists(os.path.join('/home/ljc/code/AMOS22/data/pointcloud', '{}.npy'.format(file_name))):
+        centre_arr = np.zeros_like(label_arr)
+        for i in np.unique(label_arr).tolist():
+            if i == 0:
+                continue
+            x, y, z = np.mean(np.array(np.where(label_arr == i)), 1, dtype=int)
+            centre_arr[x, y, z] = i
+        np.save(save_path, centre_arr)
+        print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
+        return centre_arr
+    print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
+    return np.load(save_path).astype(np.int8)
+
+
 if __name__ == '__main__':
     ori_file_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr/amos_0001.nii.gz'
     label_file_path = '/home/ljc/code/AMOS22/data/AMOS22/labelsTr/amos_0001.nii.gz'

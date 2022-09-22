@@ -49,13 +49,13 @@ def trans_3d_2_mp4(image_array, result_array):
     os.remove('array.gif')
 
 
-origin_image_path = '../utils/amos_0008.nii.gz'
-label_image_path = '../utils/amos_0008I.nii.gz'
-image = np.array(sitk.GetArrayFromImage(sitk.ReadImage(origin_image_path)).astype(np.int16))
-label = np.array(sitk.GetArrayFromImage(sitk.ReadImage(label_image_path)).astype(np.int8))
-image = torch.from_numpy(image).type(torch.FloatTensor)
-label = torch.from_numpy(label).type(torch.FloatTensor)
-trans_3d_2_mp4(image, label)
+# origin_image_path = '../utils/amos_0008.nii.gz'
+# label_image_path = '../utils/amos_0008I.nii.gz'
+# image = np.array(sitk.GetArrayFromImage(sitk.ReadImage(origin_image_path)).astype(np.int16))
+# label = np.array(sitk.GetArrayFromImage(sitk.ReadImage(label_image_path)).astype(np.int8))
+# image = torch.from_numpy(image).type(torch.FloatTensor)
+# label = torch.from_numpy(label).type(torch.FloatTensor)
+# trans_3d_2_mp4(image, label)
 
 
 def overlap(images, outputs, slice=1 / 3):
@@ -119,25 +119,27 @@ def bind(a, b):
     mask_image.putpalette(palettedata)
     mask_image = mask_image.convert('RGB')
     img = Image.blend(ori_image, mask_image, 0.7)  # blend_img = img1 * (1 – 0.3) + img2* alpha
-    img.save('..' + '/result_overlap/pt_{}_compare_{}.png'.format(1, 2))
 
 
-def show_two(a, b, file_name, slices=1.0 / 2):
-    a = a.data.squeeze().cpu().numpy()
-    b = b.data.squeeze().cpu().numpy()
-    ori_image = np.expand_dims(a[int(a.shape[0] * slices), :, :], -1)
-    mask_image = np.expand_dims(b[int(b.shape[0] * slices), :, :], -1)
-    img_show = np.concatenate((ori_image, mask_image), axis=0)
-    image_show = Image.fromarray(img_show[:, :, 0].astype('uint8'), 'P')
-    palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51, 255,
-                   102, 153, 51, 102, 102, 51, 153, 255, 20, 20, 20, 255, 255, 194, 10, 255, 51, 51, 153, 255, 255, 61,
-                   255, 0, 128]
-    image_show.putpalette(palettedata)
-    image_show = image_show.convert('RGB')
-    if file_name != '' or None:
-        image_show.save('..' + '/result_overlap/{}.png'.format(file_name))
-    else:
-        image_show.save('..' + '/result_overlap/pt_{}_compare_{}.png'.format(1, 2))
+#     img.save('..' + '/result_overlap/pt_{}_compare_{}.png'.format(1, 2))
+#
+#
+# def show_two(a, b, file_name, slices=1.0 / 2):
+#     a = a.data.squeeze().cpu().numpy()
+#     b = b.data.squeeze().cpu().numpy()
+#     ori_image = np.expand_dims(a[int(a.shape[0] * slices), :, :], -1)
+#     mask_image = np.expand_dims(b[int(b.shape[0] * slices), :, :], -1)
+#     img_show = np.concatenate((ori_image, mask_image), axis=0)
+#     image_show = Image.fromarray(img_show[:, :, 0].astype('uint8'), 'P')
+#     palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51, 255,
+#                    102, 153, 51, 102, 102, 51, 153, 255, 20, 20, 20, 255, 255, 194, 10, 255, 51, 51, 153, 255, 255, 61,
+#                    255, 0, 128]
+#     image_show.putpalette(palettedata)
+#     image_show = image_show.convert('RGB')
+#     if file_name != '' or None:
+#         image_show.save('..' + '/result_overlap/{}.png'.format(file_name))
+#     else:
+#         image_show.save('..' + '/result_overlap/pt_{}_compare_{}.png'.format(1, 2))
 
 
 import SimpleITK as sitk
@@ -184,7 +186,7 @@ def concat_image(ORI, GT, PRED, save_path='', no=0, slices=1.0 / 3):
     '''
     HEIGHT = ORI.shape[-1]
     WIDTH = ORI.shape[-2]
-    ORI = trans_image(ORI, slices=slices, mode='L')
+    ORI = trans_image(ORI, slices=slices, mode='P')
     GT = trans_image(GT, slices=slices, mode='P')
     PRED = trans_image(PRED, slices=slices, mode='P')
     palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51, 255,
@@ -205,11 +207,45 @@ def concat_image(ORI, GT, PRED, save_path='', no=0, slices=1.0 / 3):
         target.save('..' + '/result_overlap/pt{}_ori_compare_gt_and_pred.png'.format(no))
 
 
+def concat_image2(ORI, GT, PRED, k):
+    '''
+        ORI shape = b,c,d,w,h
+        G T shape = b,c,d,w,h
+        PRED shape = b,c,d,w,h
+    '''
+    HEIGHT = ORI.shape[-1]
+    WIDTH = ORI.shape[-2]
+    L = ORI.shape[-3]
+    for slices in range(L):
+        ORI_ = trans_image(ORI, slices=slices, mode='P')
+        GT_ = trans_image(GT, slices=slices, mode='P')
+        PRED_ = trans_image(PRED, slices=slices, mode='P')
+        palettedata = [0, 0, 0, 102, 0, 255, 0, 255, 176, 51, 255, 204, 184, 138, 0, 255, 102, 51, 102, 51, 255, 51,
+                       255,
+                       102, 153, 51, 102, 102, 51, 153, 255, 20, 20, 20, 255, 255, 194, 10, 255, 51, 51, 153, 255, 255,
+                       61,
+                       255, 0, 128]
+        GT_.putpalette(palettedata)
+        PRED_.putpalette(palettedata)
+        GT_ = GT_.convert('RGB')
+        PRED_ = PRED_.convert('RGB')
+        target = Image.new('RGB', (WIDTH * COL, HEIGHT * ROW))
+        image_files = [ORI_, GT_, PRED_]
+        for row in range(ROW):
+            for col in range(COL):
+                target.paste(image_files[COL * row + col], (0 + WIDTH * col, 0 + HEIGHT * row))
+        dirs = '..' + '/result_overlap/{}'.format(k)
+        if not os.path.exists(dirs):  # 如果不存在路径，则创建这个路径，关键函数就在这两行，其他可以改变
+            os.makedirs(dirs)
+        target.save('..' + '/result_overlap/{}/{}.png'.format(k, slices))
+
+
 def trans_image(x, slices, mode="P"):
     # 删除为一的维度 batchsize，channel
     x = x.data.squeeze().cpu().numpy()
     # 将d维度转移到最后一维
-    x = np.expand_dims(x[int(x.shape[0] * slices), :, :], -1)
+    x = np.expand_dims(x[slices, :, :], -1)
+    x = np.flip(x, axis=0)
     # 将ORI,GT,PRED转化为PIL的image
     x = Image.fromarray(x[:, :, 0].astype('uint8'), mode=mode)
     return x
@@ -221,7 +257,7 @@ def trans_image(x, slices, mode="P"):
 # b = torch.Tensor(b)
 # show_two(a, b, 'test')
 # save_image_information()
-import SimpleITK as sitk
+# import SimpleITK as sitk
 
 # model = UnetModel(1, 16, 6)
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
@@ -248,6 +284,6 @@ from src.process.task2_sliding_window2 import train_path
 #     y_array = np.array(sitk.GetArrayFromImage(sitk.ReadImage(y_path)).astype(np.int16))
 #     x_tensor = torch.from_numpy(x_array).type(torch.FloatTensor)
 #     y_tensor = torch.from_numpy(y_array).type(torch.FloatTensor)
-#     # concat_image(x_tensor, y_tensor, y_tensor)
+#     concat_image(x_tensor, y_tensor, y_tensor)
 #     overlap(x_tensor, y_tensor)
 #     pass

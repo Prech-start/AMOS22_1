@@ -239,7 +239,7 @@ class DecoderBlock(nn.Module):
         return x
 
 
-class UnetModel(nn.Module):
+class UnetModel2(nn.Module):
 
     def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
         super(UnetModel, self).__init__()
@@ -262,6 +262,24 @@ class UnetModel(nn.Module):
         # print("Final output shape: ", x.shape)
         return seg_x, centre_x
 
+class UnetModel(nn.Module):
+
+    def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
+        super(UnetModel, self).__init__()
+        self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
+        self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
+        # self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
+        if final_activation == "sigmoid":
+            self.sigmoid = nn.Sigmoid()
+        else:
+            self.sigmoid = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        x, downsampling_features = self.encoder(x)
+        seg_x = self.decoder(x, downsampling_features)
+        seg_x = self.sigmoid(seg_x)
+        # print("Final output shape: ", x.shape)
+        return seg_x
 
 class ConvTranspose(nn.Module):
     def __init__(self, in_channels, out_channels, k_size=3, stride=2, padding=1, output_padding=1):
@@ -280,7 +298,7 @@ class ConvTranspose(nn.Module):
 if __name__ == '__main__':
     x = torch.rand(size=[1, 1, 64, 256, 256])
     # skip = torch.rand(size=[1, 256, 14, 14, 1])
-    model = UnetModel(1, 16, model_depth=4)
+    model = UnetModel2(1, 16, model_depth=4)
     # button shape 256,13,13,1
     y, z = model(x)
     print(y.shape, z.shape)

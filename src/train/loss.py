@@ -109,30 +109,30 @@ class BCELoss_with_weight(nn.Module):
 # k = bce(a, b)
 # k.backward()
 # print(k.item())
-from src.model.model import *
-from torch.nn.functional import one_hot
-import os
-import src.process.task2_sliding_window2 as loader
-from einops import rearrange
-from src.utils.accuracy import calculate_acc, DICE
-
-valid_loader = loader.get_valid_data()
-class_num = 16
-model = UnetModel(1, class_num, 6)
-model.load_state_dict(
-    torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_sliding_window', 'Unet-40.pth')))
-v_acc = []
-for index, (data, y) in enumerate(valid_loader):
-    # valid data
-
-    model.cpu()
-    y = torch.LongTensor(y.long())
-    y = one_hot(y, 16)
-    target = rearrange(y, 'b d w h c -> b c d w h')
-    # training param
-    output = model(data.float())
-    print('process {}'.format(index))
-    v_acc.append(np.mean(
-        calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
-                      is_training=True)))
-print(np.mean(v_acc))
+# from src.model.model import *
+# from torch.nn.functional import one_hot
+# import os
+# import src.process.task2_sliding_window2 as loader
+# from einops import rearrange
+# from src.utils.accuracy import calculate_acc, DICE
+#
+# valid_loader = loader.get_test_data()
+# class_num = 16
+# model = UnetModel(1, class_num, 6)
+# model.load_state_dict(
+#     torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_sliding_window', 'Unet-40.pth')))
+# v_acc = []
+# for index, (data, y) in enumerate(valid_loader):
+#     # valid data
+#
+#     model.cpu()
+#     y = torch.LongTensor(y.long())
+#     y = one_hot(y, 16)
+#     target = rearrange(y, 'b d w h c -> b c d w h')
+#     # training param
+#     output = model(data.float())
+#     print('process {}'.format(index))
+#     v_acc.append(np.mean(
+#         calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
+#                       is_training=True)))
+# print(np.mean(v_acc))

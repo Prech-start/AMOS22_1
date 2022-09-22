@@ -9,7 +9,7 @@ from skimage.transform import resize
 import SimpleITK as sitk
 import json
 import sys
-from src.utils.trans_to_pointcloud import cal_centre_point
+from src.utils.trans_to_pointcloud import cal_centre_point_2
 
 path_dir = os.path.dirname(__file__)
 task2_json = json.load(open(os.path.join(path_dir, '..', '..', 'data', 'AMOS22', 'task2_dataset.json')))
@@ -40,21 +40,22 @@ class data_set(Dataset):
         path_ = self.paths
         x = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][0])).astype(np.int16)
         y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
-        z = cal_centre_point('', path_[item][1])
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
         x = self.norm(x)
-        # 使用slidingwindow 不使用resize
         if self.is_valid:
             x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
             y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+            # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
         else:
             x = resize(x, (x.shape[0], 256, 256), order=1, preserve_range=True, anti_aliasing=False)
             y = resize(y, (y.shape[0], 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+            # z = resize(z, (z.shape[0], 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        z = cal_centre_point_2(y.squeeze(), path_[item][1])
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
         z = torch.from_numpy(z).type(torch.FloatTensor)
-        return x, y,
+        return x, y, z
 
     def __len__(self):
         return len(self.paths)
@@ -96,4 +97,4 @@ def get_valid_data():
 if __name__ == '__main__':
     d = get_dataloader()
     for i, j, k in d:
-        print(k.shape)
+        print(torch.unique(k))
