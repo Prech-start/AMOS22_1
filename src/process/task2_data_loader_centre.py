@@ -32,9 +32,8 @@ test_path = CT_test_path + MRI_test_path
 
 
 class data_set(Dataset):
-    def __init__(self, file_path, is_valid=False):
+    def __init__(self, file_path):
         self.paths = file_path
-        self.is_valid = is_valid
 
     def __getitem__(self, item):
         path_ = self.paths
@@ -43,14 +42,9 @@ class data_set(Dataset):
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
         x = self.norm(x)
-        if self.is_valid:
-            x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
-            y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-            # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-        else:
-            x = resize(x, (x.shape[0], 256, 256), order=1, preserve_range=True, anti_aliasing=False)
-            y = resize(y, (y.shape[0], 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-            # z = resize(z, (z.shape[0], 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
+        y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
         z = cal_centre_point_2(y.squeeze(), path_[item][1])
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
@@ -76,17 +70,25 @@ def collate_fun():
     pass
 
 
-def get_dataloader(is_train=True, batch_size=1):
-    data = data_set(train_path if is_train else test_path)
+def get_train_data(batch_size=1):
+    data = data_set(train_path)
     return DataLoader(
         dataset=data,
         batch_size=batch_size,
-        shuffle=True if is_train else False
+        shuffle=True
     )
 
 
 def get_valid_data():
-    data = data_set(valid_path, is_valid=True)
+    data = data_set(valid_path)
+    return DataLoader(
+        dataset=data,
+        batch_size=1,
+        shuffle=False
+    )
+
+def get_test_data():
+    data = data_set(test_path)
     return DataLoader(
         dataset=data,
         batch_size=1,
@@ -95,6 +97,6 @@ def get_valid_data():
 
 
 if __name__ == '__main__':
-    d = get_dataloader()
+    d = get_valid_data()
     for i, j, k in d:
         print(torch.unique(k))

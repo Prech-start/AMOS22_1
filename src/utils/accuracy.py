@@ -139,7 +139,8 @@ def calculate_acc(output, target, class_num, fun, is_training=False):
     # 将每一个通道都做一次acc计算
     acc = []
     if len(torch.unique(output)) != len(torch.unique(target)):
-        print('error')
+        # print('error')
+        pass
     # HD_95计算库的dtype为np.numeric
     dtype_ = bool
     for i in range(class_num):
@@ -238,9 +239,9 @@ def cal_nnunet_dice():
 from tqdm import tqdm
 import pandas as pd
 from src.process.task2_data_loader import get_train_or_test_data as get_dataloader
-#
+
 # model = UnetModel(1, 16, 6)
-# model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-180.pth')))
+# model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
 #
 # acc = calculate_dice_all(get_dataloader(False), model)
 # dices = []
@@ -250,6 +251,7 @@ from src.process.task2_data_loader import get_train_or_test_data as get_dataload
 #     dices.append(c_dice)
 # dices = np.array(dices)
 # print(dices)
+# print(np.mean(dices))
 
 # if __name__ == '__main__':
 #     data_loader = get_dataloader(is_train=False, batch_size=1)
@@ -273,7 +275,7 @@ from src.process.task2_data_loader import get_train_or_test_data as get_dataload
 #         "16": "total"
 #     }
 #     model = UnetModel(1, 16, 6)
-#     model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-240.pth')))
+#     model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
 #     dice_acc = []
 #     asd_acc = []
 #     hd_acc = []
@@ -316,58 +318,58 @@ from src.process.task2_data_loader import get_train_or_test_data as get_dataload
 #     data_matrix = pd.DataFrame(acc_matrix)
 #     data_matrix.columns = ['DICE', 'ASD_GT2PRED', 'ASD_PRED2GT', 'HD_95', 'SENSITIVITY']
 #     data_matrix.index = dict_.values()
-#     writer = pd.ExcelWriter('accuracy_weight_task2_240.xlsx')
+#     writer = pd.ExcelWriter('accuracy_weight_task2_200_norm(1).xlsx')
 #     data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
 #     writer.save()
 #     print('error number:{}/{}'.format(error_num, len(data_loader)))
 #     print('done')
 #     # x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
 #     # calculate_acc2(x, x, 16, DICE)
-if __name__ == '__main__':
-    data_loader = get_dataloader(is_train=False, batch_size=1)
-    dict_ = {
-        # "0": "background",
-        "1": "spleen",
-        "2": "right kidney",
-        "3": "left kidney",
-        "4": "gall bladder",
-        "5": "esophagus",
-        "6": "liver",
-        "7": "stomach",
-        "8": "aorta",
-        "9": "postcava",
-        "10": "pancreas",
-        "11": "right adrenal gland",
-        "12": "left adrenal gland",
-        "13": "duodenum",
-        "14": "bladder",
-        "15": "prostate/uterus",
-        "16": "total"
-    }
-    model = UnetModel(1, 16, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-220.pth')))
-
-    acc_nnunet = cal_nnunet_dice()
-    acc = calculate_dice_all(get_dataloader(False), model)
-    dices = []
-    dices_nnunet = []
-    for n_class in range(0, 16):
-        c_dices = acc[..., n_class]
-        c_dices_nnunet = acc_nnunet[..., n_class]
-        c_dice = np.mean(c_dices[np.where(c_dices != -1)])
-        c_dice_nnunet = np.mean(c_dices_nnunet[np.where(c_dices_nnunet != -1)])
-        dices.append(c_dice)
-        dices_nnunet.append(c_dice_nnunet)
-    dices = np.array(dices)
-    dices_nnunet = np.array(dices_nnunet)
-    # 将每一个指标存进execl
-    acc_matrix = [dices, dices_nnunet]
-    # acc_matrix.shape = acc_num, item_num, class_num
-    acc_matrix = np.array(acc_matrix).T
-    data_matrix = pd.DataFrame(acc_matrix)
-    data_matrix.columns = ['DICE', 'DICE_nnunet']
-    data_matrix.index = dict_.values()
-    writer = pd.ExcelWriter('accuracy_weight_task2_220_dice.xlsx')
-    data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
-    writer.save()
-    print('done')
+# if __name__ == '__main__':
+#     data_loader = get_dataloader(is_train=False, batch_size=1)
+#     dict_ = {
+#         # "0": "background",
+#         "1": "spleen",
+#         "2": "right kidney",
+#         "3": "left kidney",
+#         "4": "gall bladder",
+#         "5": "esophagus",
+#         "6": "liver",
+#         "7": "stomach",
+#         "8": "aorta",
+#         "9": "postcava",
+#         "10": "pancreas",
+#         "11": "right adrenal gland",
+#         "12": "left adrenal gland",
+#         "13": "duodenum",
+#         "14": "bladder",
+#         "15": "prostate/uterus",
+#         "16": "total"
+#     }
+#     model = UnetModel(1, 16, 6)
+#     model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
+#
+#     acc_nnunet = cal_nnunet_dice()
+#     acc = calculate_dice_all(get_dataloader(False), model)
+#     dices = []
+#     dices_nnunet = []
+#     for n_class in range(0, 16):
+#         c_dices = acc[..., n_class]
+#         c_dices_nnunet = acc_nnunet[..., n_class]
+#         c_dice = np.mean(c_dices[np.where(c_dices != -1)])
+#         c_dice_nnunet = np.mean(c_dices_nnunet[np.where(c_dices_nnunet != -1)])
+#         dices.append(c_dice)
+#         dices_nnunet.append(c_dice_nnunet)
+#     dices = np.array(dices)
+#     dices_nnunet = np.array(dices_nnunet)
+#     # 将每一个指标存进execl
+#     acc_matrix = [dices, dices_nnunet]
+#     # acc_matrix.shape = acc_num, item_num, class_num
+#     acc_matrix = np.array(acc_matrix).T
+#     data_matrix = pd.DataFrame(acc_matrix)
+#     data_matrix.columns = ['DICE', 'DICE_nnunet']
+#     data_matrix.index = dict_.values()
+#     writer = pd.ExcelWriter('accuracy_weight_task2_220_dice.xlsx')
+#     data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
+#     writer.save()
+#     print('done')

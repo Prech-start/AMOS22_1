@@ -37,5 +37,4 @@ def pic_loss_acc():
         ax.legend()
         ax2.legend()
         plt.savefig('loss_acc_line_final.png', bbox_inches='tight')
-pic_loss_acc()
 

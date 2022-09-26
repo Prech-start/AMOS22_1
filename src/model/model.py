@@ -222,6 +222,7 @@ class DecoderBlock(nn.Module):
                 self.final_conv = ConvBlock(in_channels=feat_map_channels * 2, out_channels=out_channels)
                 self.module_dict["final_conv"] = self.final_conv
 
+
     def forward(self, x, down_sampling_features):
         """
         :param x: inputs
@@ -239,13 +240,32 @@ class DecoderBlock(nn.Module):
         return x
 
 
+class UnetModel3(nn.Module):
+
+    def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
+        super(UnetModel3, self).__init__()
+        self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
+        self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
+        # self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
+        if final_activation == "sigmoid":
+            self.sigmoid = nn.Sigmoid()
+        else:
+            self.sigmoid = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        x, downsampling_features = self.encoder(x)
+        seg_x = self.decoder(x, downsampling_features)
+        seg_x = self.sigmoid(seg_x)
+        # print("Final output shape: ", x.shape)
+        return seg_x
+
 class UnetModel2(nn.Module):
 
     def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
-        super(UnetModel, self).__init__()
+        super(UnetModel2, self).__init__()
         self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
         self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
-        self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
+        self.decoder_centre = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
         self.softmax = nn.Softmax(dim=1)
         self.sigmoid = nn.Sigmoid()
         # if final_activation == "sigmoid":
@@ -258,7 +278,7 @@ class UnetModel2(nn.Module):
         seg_x = self.decoder(x, downsampling_features)
         centre_x = self.decoder_centre(x, downsampling_features)
         seg_x = self.softmax(seg_x)
-        centre_x = self.sigmoid(centre_x)
+        centre_x = self.softmax(centre_x)
         # print("Final output shape: ", x.shape)
         return seg_x, centre_x
 

@@ -49,6 +49,7 @@ class data_set(Dataset):
         return len(self.paths)
 
     def norm(self, x):
+        #
         if np.min(x) < 0:
             # CT 图像处理
             x = np.clip(x, a_min=-175, a_max=250)
@@ -56,6 +57,13 @@ class data_set(Dataset):
         else:
             # MRI 图像处理
             x = (x - np.min(x)) / (np.max(x) - np.min(x))
+        return x
+
+    def Standardization(self, x):
+        mean_x = np.mean(x)
+        std_x = np.std(x)
+        if std_x != 0:
+            x = (x - mean_x) / std_x
         return x
 
 
