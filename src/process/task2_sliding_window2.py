@@ -9,7 +9,7 @@ import pickle
 from skimage.transform import resize
 import SimpleITK as sitk
 import json
-
+import yaml
 
 def sliding_3D_window(image, window_size, step):
     # image.shape = b, c, d, w, h
