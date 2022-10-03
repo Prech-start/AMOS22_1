@@ -38,14 +38,15 @@ class data_set(Dataset):
     def __getitem__(self, item):
         path_ = self.paths
         x = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][0])).astype(np.int16)
-        y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
+        y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int16)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
-        x = self.norm(x)
         x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
         y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        x = self.norm(x)
+        x = self.Standardization(x)
         # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-        z = cal_centre_point_2(y.squeeze(), path_[item][1])
+        z = cal_centre_point_2(y.squeeze(), path_[item][1], r=10)
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
         z = torch.from_numpy(z).type(torch.FloatTensor)
@@ -55,14 +56,21 @@ class data_set(Dataset):
         return len(self.paths)
 
     def norm(self, x):
+        #
         if np.min(x) < 0:
             # CT 图像处理
-            x = x + 1024.0
-            x = np.clip(x, a_min=0, a_max=2048.0)
-            x = x / 2048.0
+            x = np.clip(x, a_min=-175, a_max=250)
+            x = (x + 175) / 425
         else:
             # MRI 图像处理
             x = (x - np.min(x)) / (np.max(x) - np.min(x))
+        return x
+
+    def Standardization(self, x):
+        mean_x = np.mean(x)
+        std_x = np.std(x)
+        if std_x != 0:
+            x = (x - mean_x) / std_x
         return x
 
 
@@ -87,6 +95,7 @@ def get_valid_data():
         shuffle=False
     )
 
+
 def get_test_data():
     data = data_set(test_path)
     return DataLoader(
@@ -99,4 +108,4 @@ def get_test_data():
 if __name__ == '__main__':
     d = get_valid_data()
     for i, j, k in d:
-        print(torch.unique(k))
+        print(torch.unique(j))

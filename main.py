@@ -35,7 +35,7 @@ if __name__ == '__main__':
     class_num = 16
     learning_rate = 1e-4
     epoch = 300
-    model = UnetModel2(1, class_num, 6)
+    model = UnetModel3(1, class_num, 6)
     # 是否加载模型
     is_load = False
     # 是否迁移模型
