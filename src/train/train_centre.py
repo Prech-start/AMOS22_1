@@ -78,12 +78,14 @@ def sliding_3D_window3(image, window_height, step):
 
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
+    n_epoch, max_epoch = epoch
     # ---------------------------------------------------
     t_loss = []
     v_loss = []
     v_acc = []
     train_loader, valid_loader = data_loader
     loss_dice, loss_L1 = criterion
+    weight = ((n_epoch - max_epoch) ** 2) / ((1 - max_epoch) ** 2)
     # ---------------------------------------------------
     model.train()
     model.to(device)
@@ -92,11 +94,6 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
         optimizer.zero_grad()
         # trans GT to onehot
         GT = torch.LongTensor(GT.long())
-
-        # 16通道输出centre
-        GT_centre = torch.LongTensor(GT_centre.long())
-        GT_centre = one_hot(GT_centre, 16)
-
         data = data.float().to(device)
         GT = one_hot(GT, 16)
         GT = rearrange(GT, 'b d w h c -> b c d w h')
@@ -104,11 +101,10 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
         output, out_centre = model(Variable(data))
         GT = GT.to(device)
         loss_ = loss_dice(output, GT.float())
-        GT_centre = rearrange(GT_centre, 'b d w h c -> b c d w h')
+        GT_centre = GT_centre.unsqueeze(0)
         GT_centre = GT_centre.to(device)
-        print(out_centre.shape, GT_centre.shape)
+        # print(out_centre.shape, GT_centre.shape)
         loss_centre = loss_L1(out_centre, GT_centre.float())
-        weight = 0.1
         loss = (1 - weight) * loss_ + weight * loss_centre
         loss.backward()
         optimizer.step()
@@ -124,7 +120,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
 
         target = rearrange(GT, 'b d w h c -> b c d w h')
         # training param
-        output,_ = model(data.float())
+        output, _ = model(data.float())
         loss = loss_dice(output, target.float())
         v_acc.append(np.mean(
             calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
@@ -199,16 +195,20 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
     train_loader = loader.get_train_data(batch_size=batch_size)
     valid_loader = loader.get_valid_data()
     train_valid_loader = [train_loader, valid_loader]
-    train_loss = []
-    valid_loss = []
-    valid_acc = []
+    if is_load:
+        with open(os.path.join('tem.tmp'), 'rb+') as f:
+            train_loss, valid_loss, valid_acc = pickle.load(f)
+    else:
+        train_loss = []
+        valid_loss = []
+        valid_acc = []
     import datetime
     start = time.time()
     # ----------------------------------------------------------------
     for epoch in range(1, n_epochs + 1):
         seconds = time.time() - start
         print('{} / {} epoch, cost_time {:.0f}min:'.format(epoch, n_epochs, seconds // 60))
-        t_loss, v_loss, v_acc = train_and_valid_model(epoch=epoch, model=pre_train_model,
+        t_loss, v_loss, v_acc = train_and_valid_model(epoch=[epoch, n_epochs], model=pre_train_model,
                                                       data_loader=train_valid_loader,
                                                       device=device, optimizer=optimizer,
                                                       criterion=criterion)
@@ -220,9 +220,8 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
         valid_loss.append(v_loss)
         valid_acc.append(v_acc)
         # 保存训练的loss
-        if not is_load:
-            save_loss(train_loss, valid_loss, valid_acc)
-            pic_loss_line()
+        save_loss(train_loss, valid_loss, valid_acc)
+        pic_loss_acc()
     return pre_train_model
 
 
@@ -249,8 +248,8 @@ if __name__ == '__main__':
     print('beginning training')
     class_num = 16
     learning_rate = 1e-4
-    epoch = 300
-    model = UnetModel2(1, class_num, 6)
+    max_epoch = 300
+    model = UnetModel3(1, class_num, 6)
     # 是否加载模型
     is_load = False
     # 是否迁移模型
@@ -262,7 +261,8 @@ if __name__ == '__main__':
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss = BCELoss_with_weight(loss_weight)
     loss_centre = torch.nn.L1Loss()
+    # 150 768min
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer,
+    model = train(pre_train_model=model, n_epochs=max_epoch, batch_size=1, optimizer=optimizer,
                   criterion=[loss, loss_centre],
-                  device=torch.device('cuda:0'), is_load=is_load)
+                  device=torch.device('cpu'), is_load=is_load)
