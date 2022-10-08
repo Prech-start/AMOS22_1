@@ -195,9 +195,13 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
     train_loader = loader.get_train_data(batch_size=batch_size)
     valid_loader = loader.get_valid_data()
     train_valid_loader = [train_loader, valid_loader]
-    train_loss = []
-    valid_loss = []
-    valid_acc = []
+    if is_load:
+        with open(os.path.join('tem.tmp'), 'rb+') as f:
+            train_loss, valid_loss, valid_acc = pickle.load(f)
+    else:
+        train_loss = []
+        valid_loss = []
+        valid_acc = []
     import datetime
     start = time.time()
     # ----------------------------------------------------------------
@@ -216,9 +220,8 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
         valid_loss.append(v_loss)
         valid_acc.append(v_acc)
         # 保存训练的loss
-        if not is_load:
-            save_loss(train_loss, valid_loss, valid_acc)
-            pic_loss_acc()
+        save_loss(train_loss, valid_loss, valid_acc)
+        pic_loss_acc()
     return pre_train_model
 
 
@@ -258,6 +261,7 @@ if __name__ == '__main__':
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss = BCELoss_with_weight(loss_weight)
     loss_centre = torch.nn.L1Loss()
+    # 150 768min
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     model = train(pre_train_model=model, n_epochs=max_epoch, batch_size=1, optimizer=optimizer,
                   criterion=[loss, loss_centre],
