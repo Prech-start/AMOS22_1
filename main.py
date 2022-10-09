@@ -44,7 +44,7 @@ if __name__ == '__main__':
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
     if is_move:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
-    loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
+    loss_weight = [1, 3, 3, 4, 8, 9, 1, 6, 4, 5, 6, 10, 12, 10, 6, 8]
     loss = BCELoss_with_weight(loss_weight)
     loss_centre = torch.nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

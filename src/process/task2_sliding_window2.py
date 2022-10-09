@@ -10,6 +10,7 @@ from skimage.transform import resize
 import SimpleITK as sitk
 import json
 
+
 def sliding_3D_window(image, window_size, step):
     # image.shape = b, c, d, w, h
     # step must smaller than window_size
@@ -68,7 +69,6 @@ class data_set(Dataset):
         y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
-        x = self.test_norm(x)
         # 使用slidingwindow 不使用resize
         if self.is_valid:
             x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
@@ -76,6 +76,8 @@ class data_set(Dataset):
         else:
             x = resize(x, (x.shape[0], 256, 256), order=1, preserve_range=True, anti_aliasing=False)
             y = resize(y, (y.shape[0], 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        x = self.norm(x)
+        x = self.Standardization(x)
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
         return x, y
@@ -84,17 +86,7 @@ class data_set(Dataset):
         return len(self.paths)
 
     def norm(self, x):
-        if np.min(x) < 0:
-            # CT 图像处理
-            x = x + 1024.0
-            x = np.clip(x, a_min=0, a_max=2048.0)
-            x = x / 2048.0
-        else:
-            # MRI 图像处理
-            x = (x - np.min(x)) / (np.max(x) - np.min(x))
-        return x
-
-    def test_norm(self, x):
+        #
         if np.min(x) < 0:
             # CT 图像处理
             x = np.clip(x, a_min=-175, a_max=250)
@@ -104,22 +96,38 @@ class data_set(Dataset):
             x = (x - np.min(x)) / (np.max(x) - np.min(x))
         return x
 
+    def Standardization(self, x):
+        mean_x = np.mean(x)
+        std_x = np.std(x)
+        if std_x != 0:
+            x = (x - mean_x) / std_x
+        return x
+
 
 def collate_fun():
     pass
 
 
-def get_dataloader(is_train=True, batch_size=1):
-    data = data_set(train_path if is_train else valid_path)
+def get_train_data(batch_size=1):
+    data = data_set(train_path)
     return DataLoader(
         dataset=data,
         batch_size=batch_size,
-        shuffle=True if is_train else False
+        shuffle=True
+    )
+
+
+def get_valid_data():
+    data = data_set(valid_path, is_valid=True)
+    return DataLoader(
+        dataset=data,
+        batch_size=1,
+        shuffle=False
     )
 
 
 def get_test_data():
-    data = data_set(test_path, is_valid=True)
+    data = data_set(test_path)
     return DataLoader(
         dataset=data,
         batch_size=1,

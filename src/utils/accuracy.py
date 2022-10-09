@@ -197,6 +197,41 @@ def calculate_dice_all(test_loader, model):
     return np.array(dice)
 
 
+def calculate_dice_all_centre(test_loader, model):
+    from einops import rearrange
+    model.cpu()
+    dice = []
+    class_num = 16
+    dtype_ = bool
+
+    with torch.no_grad():
+        for x, y in tqdm(test_loader):
+            acc = []
+            target = torch.LongTensor(y.long())
+            output, _ = model(x.float())
+            output = torch.argmax(output, 1)
+            pred = copy.deepcopy(output.data.squeeze().numpy())
+            true = copy.deepcopy(target.data.squeeze().numpy())
+            pred = one_hot(torch.LongTensor(pred), 16).numpy().astype(dtype_)
+            true = one_hot(torch.LongTensor(true), 16).numpy().astype(dtype_)
+            uni_list = torch.unique(target)
+            all_list = [i for i in range(16)]
+            for i in range(class_num):
+                # 跳过background
+                if i == 0:
+                    continue
+                if i not in uni_list and i in all_list:
+                    temp = -1
+                else:
+                    temp = DICE(pred[..., i], true[..., i])
+                acc.append(temp)
+            pred = output.data.squeeze().numpy().astype(bool)
+            true = target.data.squeeze().numpy().astype(bool)
+            acc.append(DICE(pred, true))
+            dice.append(acc)
+    return np.array(dice)
+
+
 def cal_nnunet_dice():
     from glob import glob
     dice = []
@@ -234,11 +269,10 @@ def cal_nnunet_dice():
     return np.array(dice)
 
 
-
-
 from tqdm import tqdm
 import pandas as pd
 from src.process.task2_data_loader import get_train_or_test_data as get_dataloader
+
 
 # model = UnetModel(1, 16, 6)
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
@@ -325,51 +359,60 @@ from src.process.task2_data_loader import get_train_or_test_data as get_dataload
 #     print('done')
 #     # x = torch.Tensor(np.zeros([1, 1, 5, 5, 5]))
 #     # calculate_acc2(x, x, 16, DICE)
-# if __name__ == '__main__':
-#     data_loader = get_dataloader(is_train=False, batch_size=1)
-#     dict_ = {
-#         # "0": "background",
-#         "1": "spleen",
-#         "2": "right kidney",
-#         "3": "left kidney",
-#         "4": "gall bladder",
-#         "5": "esophagus",
-#         "6": "liver",
-#         "7": "stomach",
-#         "8": "aorta",
-#         "9": "postcava",
-#         "10": "pancreas",
-#         "11": "right adrenal gland",
-#         "12": "left adrenal gland",
-#         "13": "duodenum",
-#         "14": "bladder",
-#         "15": "prostate/uterus",
-#         "16": "total"
-#     }
-#     model = UnetModel(1, 16, 6)
-#     model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
-#
-#     acc_nnunet = cal_nnunet_dice()
-#     acc = calculate_dice_all(get_dataloader(False), model)
-#     dices = []
-#     dices_nnunet = []
-#     for n_class in range(0, 16):
-#         c_dices = acc[..., n_class]
-#         c_dices_nnunet = acc_nnunet[..., n_class]
-#         c_dice = np.mean(c_dices[np.where(c_dices != -1)])
-#         c_dice_nnunet = np.mean(c_dices_nnunet[np.where(c_dices_nnunet != -1)])
-#         dices.append(c_dice)
-#         dices_nnunet.append(c_dice_nnunet)
-#     dices = np.array(dices)
-#     dices_nnunet = np.array(dices_nnunet)
-#     # 将每一个指标存进execl
-#     acc_matrix = [dices, dices_nnunet]
-#     # acc_matrix.shape = acc_num, item_num, class_num
-#     acc_matrix = np.array(acc_matrix).T
-#     data_matrix = pd.DataFrame(acc_matrix)
-#     data_matrix.columns = ['DICE', 'DICE_nnunet']
-#     data_matrix.index = dict_.values()
-#     writer = pd.ExcelWriter('accuracy_weight_task2_220_dice.xlsx')
-#     data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
-#     writer.save()
-#     print('done')
+
+def cal_dice():
+    data_loader = get_dataloader(is_train=False, batch_size=1)
+    dict_ = {
+        # "0": "background",
+        "1": "spleen",
+        "2": "right kidney",
+        "3": "left kidney",
+        "4": "gall bladder",
+        "5": "esophagus",
+        "6": "liver",
+        "7": "stomach",
+        "8": "aorta",
+        "9": "postcava",
+        "10": "pancreas",
+        "11": "right adrenal gland",
+        "12": "left adrenal gland",
+        "13": "duodenum",
+        "14": "bladder",
+        "15": "prostate/uterus",
+        "16": "total"
+    }
+
+    model = UnetModel3(1, 16, 6)
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_centre', 'Unet-final.pth')))
+    acc_centre = calculate_dice_all_centre(get_dataloader(False), model)
+
+    model = UnetModel(1, 16, 6)
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
+    acc = calculate_dice_all(get_dataloader(False), model)
+
+    dices = []
+    dices_centre = []
+    for n_class in range(0, 16):
+        c_dices = acc[..., n_class]
+        c_dices_centre = acc_centre[..., n_class]
+        c_dice = np.mean(c_dices[np.where(c_dices != -1)])
+        c_dice_centre = np.mean(c_dices_centre[np.where(c_dices_centre != -1)])
+        dices.append(c_dice)
+        dices_centre.append(c_dice_centre)
+    dices = np.array(dices)
+    dices_centre = np.array(dices_centre)
+    # 将每一个指标存进execl
+    acc_matrix = [dices, dices_centre]
+    # acc_matrix.shape = acc_num, item_num, class_num
+    acc_matrix = np.array(acc_matrix).T
+    data_matrix = pd.DataFrame(acc_matrix)
+    data_matrix.columns = ['DICE', 'DICE_centre']
+    data_matrix.index = dict_.values()
+    writer = pd.ExcelWriter('accuracy_weight_task2_centre_final_dice.xlsx')
+    data_matrix.to_excel(writer, 'page_1', float_format='%.5f')
+    writer.save()
+    print('done')
+
+
+if __name__ == '__main__':
+    cal_dice()
