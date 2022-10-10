@@ -9,7 +9,7 @@ from src.model.model import *
 import surface_distance
 from medpy.metric import binary
 import numpy as np
-
+from src.model.model_centre import *
 
 def DICE(output, target):  # output为预测结果 target为真实结果
     smooth = 1e-5  # 防止0除
@@ -382,8 +382,8 @@ def cal_dice():
         "16": "total"
     }
 
-    model = UnetModel3(1, 16, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_centre', 'Unet-final.pth')))
+    model = UnetModel4(1, 16, 4)
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_centre2', 'Unet-250.pth')))
     acc_centre = calculate_dice_all_centre(get_dataloader(False), model)
 
     model = UnetModel(1, 16, 6)

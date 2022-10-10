@@ -28,13 +28,20 @@ def pic_loss_acc():
         loss_ = pickle.load(f)
         len_train = len(loss_[0])
         train_loss, valid_loss, valid_acc = loss_[0], loss_[1], loss_[2]
-
         fig, ax = plt.subplots()
         ax2 = ax.twinx()
-        ax.plot([i for i in range(len_train)], train_loss, '-', label='train_loss', color='blue')
-        ax.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss', color='green')
-        ax2.plot([i for i in range(len_train)], valid_acc, '-', label='valid_acc', color='black')
-        ax.legend()
-        ax2.legend()
+        lin1 = ax.plot([i for i in range(len_train)], train_loss, '-', label='train_loss', color='blue')
+        lin2 = ax.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss', color='green')
+        ax.set_xlabel('epochs')
+        ax.set_ylabel('loss')
+        ax2.set_ylabel('dice')
+        lin3 = ax2.plot([i for i in range(len_train)], valid_acc, '-', label='dice', color='black')
+        lins = lin1 + lin2 + lin3
+        labs = [l.get_label() for l in lins]
+
+        # ax.legend()
+        # ax2.legend()
+        plt.legend(lins, labs, loc=0)
         plt.savefig('loss_acc_line_final.png', bbox_inches='tight')
 
+pic_loss_acc()
