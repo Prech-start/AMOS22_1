@@ -1,18 +1,18 @@
 from src.utils.image_process import *
 from src.model.model import *
-from src.process.task2_data_loader import get_dataloader
-from src.process.task2_sliding_window2 import *
+from src.model.model_centre import *
+from src.process.task2_data_loader_centre import *
 import torch
 import numpy as np
 
 # 把dataset放到DataLoader中
 test_loader = get_test_data()
-model = UnetModel(1, 16, 6)
+model = UnetModel4(1, 16)
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot2.pth')))
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'model_onehot.pth')))
 # model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-final.pth')))
 model.cpu()
-model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-220.pth')))
+model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_centre2', 'Unet-250.pth')))
 
 
 def show_result(model):
@@ -49,10 +49,10 @@ def show_result():
     pass
 
 
-for index, (i, j) in enumerate(test_loader):
-    k = model(i.float())
+for index, (i, j, _) in enumerate(test_loader):
+    k, _ = model(i.float())
     k = torch.argmax(k, 1)
     # bind(j, k)
-    concat_image2(i * 255, j, k, index)
+    concat_image2(i * 255, j, k, 'model41{}'.format(index))
     pass
 # show_result(model)

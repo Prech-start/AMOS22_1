@@ -44,7 +44,7 @@ class data_set(Dataset):
         x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
         y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
         x = self.norm(x)
-        x = self.Standardization(x)
+        # x = self.Standardization(x)
         # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
         z = cal_centre_point_2(y.squeeze(), path_[item][1], r=10)
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)

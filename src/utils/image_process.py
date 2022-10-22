@@ -207,7 +207,7 @@ def concat_image(ORI, GT, PRED, save_path='', no=0, slices=1.0 / 3):
         target.save('..' + '/result_overlap/pt{}_ori_compare_gt_and_pred.png'.format(no))
 
 
-def concat_image2(ORI, GT, PRED, k):
+def concat_image2(ORI: object, GT: object, PRED: object, k: object) -> object:
     '''
         ORI shape = b,c,d,w,h
         G T shape = b,c,d,w,h
