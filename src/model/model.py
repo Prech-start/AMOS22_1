@@ -158,7 +158,7 @@ class ConvBlock(nn.Module):
 class EncoderBlock(nn.Module):
     def __init__(self, in_channels, model_depth=4, pool_size=2):
         super(EncoderBlock, self).__init__()
-        self.root_feat_maps = 4
+        self.root_feat_maps = 8
         self.num_conv_blocks = 2
         # self.module_list = nn.ModuleList()
         self.module_dict = nn.ModuleDict()
@@ -201,7 +201,7 @@ class DecoderBlock(nn.Module):
     def __init__(self, out_channels, model_depth=4):
         super(DecoderBlock, self).__init__()
         self.num_conv_blocks = 2
-        self.num_feat_maps = 4
+        self.num_feat_maps = 8
         # user nn.ModuleDict() to store ops
         self.module_dict = nn.ModuleDict()
 

@@ -386,8 +386,8 @@ def cal_dice():
     model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_centre2', 'Unet-250.pth')))
     acc_centre = calculate_dice_all_centre(get_dataloader(False), model)
 
-    model = UnetModel(1, 16, 6)
-    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-200.pth')))
+    model = UnetModel(1, 16)
+    model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2', 'Unet-final.pth')))
     acc = calculate_dice_all(get_dataloader(False), model)
 
     dices = []
