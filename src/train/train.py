@@ -186,6 +186,7 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
     train_loss = []
     valid_loss = []
     valid_acc = []
+    max_acc = 0.
     start = time.time()
     # ----------------------------------------------------------------
     for epoch in range(1, n_epochs + 1):
@@ -198,7 +199,9 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
         # 每20次保存一次模型
         if epoch % 10 == 0:
             torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch)))
-        torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))
+        if v_acc > max_acc:
+            torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))
+            max_acc = v_acc
         train_loss.append(t_loss)
         valid_loss.append(v_loss)
         valid_acc.append(v_acc)
