@@ -10,7 +10,6 @@ def save_loss(t_loss, v_loss, v_acc, filename='tem'):
     v_acc = np.array(v_acc, dtype=np.float)
     with open(os.path.join('{}.tmp'.format(filename)), 'wb+') as f:
         pickle.dump(np.array([t_loss, v_loss, v_acc]), f)
-    pass
 
 
 def pic_loss_line():
@@ -24,8 +23,8 @@ def pic_loss_line():
         plt.savefig('loss_line_final.png', bbox_inches='tight')
 
 
-def pic_loss_acc():
-    with open(os.path.join('tem.tmp'), 'rb+') as f:
+def pic_loss_acc(filename='tem'):
+    with open(os.path.join('{}.tmp'.format(filename)), 'rb+') as f:
         loss_ = pickle.load(f)
         len_train = len(loss_[0])
         train_loss, valid_loss, valid_acc = loss_[0], loss_[1], loss_[2]
@@ -45,8 +44,7 @@ def pic_loss_acc():
 
         plt.figure(figsize=(8, 8), dpi=100)
         plt.legend(lins, labs, loc='best')
-        plt.show()
-        plt.savefig('loss_acc_line_final.png', bbox_inches='tight')
+        plt.savefig('{}.png'.format(filename), bbox_inches='tight')
 
 
-pic_loss_acc()
+# pic_loss_acc()

@@ -18,7 +18,7 @@ import copy
 from src.utils.image_process import save_image_information
 from src.utils.train_utils import *
 import gc
-from src.train.loss import BCELoss_with_weight
+from src.train.loss import *
 
 sys.path.append('..')
 from src.utils.accuracy import *
@@ -74,27 +74,36 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
     return np.mean(t_loss), np.mean(v_loss), np.mean(v_acc)
 
 
-def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load):
-    path = os.path.join('..', 'checkpoints', 'auto_save_task2')
-    train_loader = loader.get_train_or_test_data(is_train=True, batch_size=batch_size)
+def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load, strategy):
+    path_dir = os.path.dirname(__file__)
+    path = os.path.join(path_dir, '..', 'checkpoints', strategy)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    train_loader = loader.get_train_data(batch_size=batch_size)
     valid_loader = loader.get_valid_data()
     train_valid_loader = [train_loader, valid_loader]
-    train_loss = []
-    valid_loss = []
-    valid_acc = []
-    max_acc = 0.
+    if is_load:
+        with open(os.path.join('{}.tmp'.format(strategy)), 'rb+') as f:
+            train_loss, valid_loss, valid_acc = pickle.load(f)
+            max_acc = 0.5
+    else:
+        train_loss = []
+        valid_loss = []
+        valid_acc = []
+        max_acc = 0.
+    import datetime
     start = time.time()
     # ----------------------------------------------------------------
     for epoch in range(1, n_epochs + 1):
         seconds = time.time() - start
         print('{} / {} epoch, cost_time {:.0f}min:'.format(epoch, n_epochs, seconds // 60))
-        t_loss, v_loss, v_acc = train_and_valid_model(epoch=epoch, model=pre_train_model,
+        t_loss, v_loss, v_acc = train_and_valid_model(epoch=[epoch, n_epochs], model=pre_train_model,
                                                       data_loader=train_valid_loader,
                                                       device=device, optimizer=optimizer,
                                                       criterion=criterion)
-        # 每20次保存一次模型
-        if epoch % 10 == 0:
-            torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch)))
+        # 每次保存最新的模型
+        torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-new.pth'))
+        # 保存最好的模型
         if v_acc > max_acc:
             torch.save(pre_train_model.state_dict(), os.path.join(path, 'Unet-final.pth'))
             max_acc = v_acc
@@ -102,9 +111,8 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
         valid_loss.append(v_loss)
         valid_acc.append(v_acc)
         # 保存训练的loss
-        if not is_load:
-            save_loss(train_loss, valid_loss, valid_acc)
-            pic_loss_line()
+        save_loss(train_loss, valid_loss, valid_acc, strategy)
+        pic_loss_acc(strategy)
     return pre_train_model
 
 
@@ -113,18 +121,19 @@ if __name__ == '__main__':
     class_num = 16
     learning_rate = 1e-4
     epoch = 300
+    strategy = 'combo'
     model = UnetModel(1, class_num)
     # 是否加载模型
     is_load = False
     # 是否迁移模型
     is_move = False
     if is_load:
-        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-new.pth')))
     if is_move:
-        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-210.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-    loss = BCELoss_with_weight(loss_weight)
+    loss = ComboLoss(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # norm2 = 2028min
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
-                  device=torch.device('cuda:0'), is_load=is_load)
+                  device=torch.device('cuda:0'), is_load=is_load, strategy=strategy)

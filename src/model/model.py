@@ -222,7 +222,6 @@ class DecoderBlock(nn.Module):
                 self.final_conv = ConvBlock(in_channels=feat_map_channels * 2, out_channels=out_channels)
                 self.module_dict["final_conv"] = self.final_conv
 
-
     def forward(self, x, down_sampling_features):
         """
         :param x: inputs
@@ -240,52 +239,9 @@ class DecoderBlock(nn.Module):
         return x
 
 
-class DecoderBlock_centre(nn.Module):
-    def __init__(self, out_channels, model_depth=4):
-        super(DecoderBlock_centre, self).__init__()
-        self.num_conv_blocks = 2
-        self.num_feat_maps = 4
-        # user nn.ModuleDict() to store ops
-        self.module_dict = nn.ModuleDict()
-
-        for depth in range(model_depth - 2, -1, -1):
-            # print(depth)
-            feat_map_channels = 2 ** (depth + 1) * self.num_feat_maps
-            # print(feat_map_channels * 4)
-            self.deconv = ConvTranspose(in_channels=feat_map_channels * 4, out_channels=feat_map_channels * 4)
-            self.module_dict["deconv_{}".format(depth)] = self.deconv
-            for i in range(self.num_conv_blocks):
-                if i == 0:
-                    self.conv = ConvBlock(in_channels=feat_map_channels * 6, out_channels=feat_map_channels * 2)
-                    self.module_dict["conv_{}_{}".format(depth, i)] = self.conv
-                else:
-                    self.conv = ConvBlock(in_channels=feat_map_channels * 2, out_channels=feat_map_channels * 2)
-                    self.module_dict["conv_{}_{}".format(depth, i)] = self.conv
-            if depth == 0:
-                self.final_conv = ConvBlock(in_channels=feat_map_channels * 2, out_channels=out_channels)
-                self.module_dict["final_conv"] = self.final_conv
-
-    def forward(self, x, down_sampling_features):
-        """
-        :param x: inputs
-        :param down_sampling_features: feature maps from encoder path
-        :return: output
-        """
-        for k, op in self.module_dict.items():
-            if k.startswith("deconv"):
-                x = op(x)
-                x = torch.cat((down_sampling_features[int(k[-1])], x), dim=1)
-            elif k.startswith("conv"):
-                x = op(x)
-            else:
-                x = op(x)
-        return x
-
-
-class UnetModel3(nn.Module):
-
+class UnetModel_centre(nn.Module):
     def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
-        super(UnetModel3, self).__init__()
+        super(UnetModel_centre, self).__init__()
         self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
         self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
         # self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
@@ -304,30 +260,6 @@ class UnetModel3(nn.Module):
         centre_x = self.conv_centre(x)
         seg_x = self.softmax(seg_x)
         centre_x = self.sigmoid(centre_x)
-        # print("Final output shape: ", x.shape)
-        return seg_x, centre_x
-
-
-class UnetModel2(nn.Module):
-
-    def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
-        super(UnetModel2, self).__init__()
-        self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
-        self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
-        self.decoder_centre = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
-        self.softmax = nn.Softmax(dim=1)
-        self.sigmoid = nn.Sigmoid()
-        # if final_activation == "sigmoid":
-        #     self.sigmoid = nn.Sigmoid()
-        # else:
-        #     self.sigmoid = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        x, downsampling_features = self.encoder(x)
-        seg_x = self.decoder(x, downsampling_features)
-        centre_x = self.decoder_centre(x, downsampling_features)
-        seg_x = self.softmax(seg_x)
-        centre_x = self.softmax(centre_x)
         # print("Final output shape: ", x.shape)
         return seg_x, centre_x
 
@@ -369,7 +301,7 @@ class ConvTranspose(nn.Module):
 if __name__ == '__main__':
     x = torch.rand(size=[1, 1, 64, 256, 256])
     # skip = torch.rand(size=[1, 256, 14, 14, 1])
-    model = UnetModel3(1, 16, model_depth=4)
+    model = UnetModel_centre(1, 16, model_depth=4)
     # button shape 256,13,13,1
     y, z = model(x)
     print(y.shape, z.shape)

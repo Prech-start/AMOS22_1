@@ -67,17 +67,26 @@ class data_set(Dataset):
         return x
 
 
-def get_train_or_test_data(is_train=True, batch_size=1):
-    data = data_set(train_path if is_train else test_path)
+def get_train_data(batch_size=1):
+    data = data_set(train_path)
     return DataLoader(
         dataset=data,
         batch_size=batch_size,
-        shuffle=True if is_train else False
+        shuffle=True
     )
 
 
 def get_valid_data():
     data = data_set(valid_path)
+    return DataLoader(
+        dataset=data,
+        batch_size=1,
+        shuffle=False
+    )
+
+
+def get_test_data():
+    data = data_set(test_path)
     return DataLoader(
         dataset=data,
         batch_size=1,

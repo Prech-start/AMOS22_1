@@ -46,35 +46,6 @@ class Generalized_Dice_loss(nn.Module):
                               (pred_flat.sum() + true_flat.sum() + smooth)))
         return loss
 
-    # def cal_subject_level_dice(prediction, target, class_weights, class_num=2):  # class_num是你分割的目标的类别个数
-    #     '''
-    #     step1: calculate the dice of each category
-    #     step2: remove the dice of the empty category and background, and then calculate the mean of the remaining dices.
-    #       :param: prediction: the automated segmentation result, a numpy array with shape of (h, w, d)
-    #       :param: target: the ground truth mask, a numpy array with shape of (h, w, d)
-    #       :param: class_num: total number of categories
-    #       :return:
-    #     '''
-    #     eps = 1e-10
-    #     empty_value = -1.0
-    #     dscs = empty_value * np.ones((class_num), dtype=np.float32)
-    #     class_weights = np.asarray(class_weights, dtype=float)
-    #     for i in range(0, class_num):
-    #         if i not in target and i not in prediction:
-    #             continue
-    #         target_per_class = np.where(target == i, 1, 0).astype(np.float32)
-    #         prediction_per_class = np.where(prediction == i, 1, 0).astype(np.float32)
-    #
-    #         tp = np.sum(prediction_per_class * target_per_class)
-    #         fp = np.sum(prediction_per_class) - tp
-    #         fn = np.sum(target_per_class) - tp
-    #         w = class_weights[i] / class_weights.sum()
-    #         dsc = w * 2 * tp / (2 * tp + fp + fn + eps)
-    #         dscs[i] = dsc
-    #     dscs = np.where(dscs == -1.0, np.nan, dscs)
-    #     subject_level_dice = np.nanmean(dscs[1:])
-    #     return 1 - subject_level_dice
-
     def forward(self, y_pred, y_true):
         return self.Generalized_Dice_Loss(y_pred, y_true, self.class_weight)
 
@@ -102,37 +73,48 @@ class BCELoss_with_weight(nn.Module):
         return weight_loss
 
 
-# loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-# bce = BCELoss_with_weight(weight=loss_weight)
-# a = torch.FloatTensor(np.ones(shape=[1, 16, 50, 50, 50]))
-# b = torch.FloatTensor(np.zeros(shape=[1, 16, 50, 50, 50]))
-# k = bce(a, b)
-# k.backward()
-# print(k.item())
-# from src.model.model import *
-# from torch.nn.functional import one_hot
-# import os
-# import src.process.task2_sliding_window2 as loader
-# from einops import rearrange
-# from src.utils.accuracy import calculate_acc, DICE
-#
-# valid_loader = loader.get_test_data()
-# class_num = 16
-# model = UnetModel(1, class_num, 6)
-# model.load_state_dict(
-#     torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_sliding_window', 'Unet-40.pth')))
-# v_acc = []
-# for index, (data, y) in enumerate(valid_loader):
-#     # valid data
-#
-#     model.cpu()
-#     y = torch.LongTensor(y.long())
-#     y = one_hot(y, 16)
-#     target = rearrange(y, 'b d w h c -> b c d w h')
-#     # training param
-#     output = model(data.float())
-#     print('process {}'.format(index))
-#     v_acc.append(np.mean(
-#         calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
-#                       is_training=True)))
-# print(np.mean(v_acc))
+class ComboLoss(nn.Module):
+    def __init__(self, weight):
+        super(ComboLoss, self).__init__()
+        self.weight = weight
+
+    def dice_loss(self, target, predictive, ep=1e-8):
+        intersection = 2. * torch.sum(predictive * target) + ep
+        union = torch.sum(predictive) + torch.sum(target) + ep
+        loss = 1 - intersection / union
+        return loss
+
+    def forward(self, pred, true):
+        alpha = 0.5
+        if len(self.weight) != pred.shape[1]:
+            print('shape is not mapping')
+            exit()
+        wei_sum = sum(self.weight)
+        CE_loss = 0.
+        DC_loss = 0.
+        batch_size = pred.shape[0]
+        for b in range(batch_size):
+            for i, class_weight in enumerate(self.weight):
+                pred_i = pred[:, i]
+                true_i = true[:, i]
+                CE_loss += (
+                        class_weight / wei_sum * F.binary_cross_entropy(pred_i, true_i, reduction='mean')
+                )
+                DC_loss += (
+                        class_weight / wei_sum * self.dice_loss(pred_i, true_i)
+                )
+        DC_loss = DC_loss / batch_size
+        CE_loss = CE_loss / batch_size
+        loss = alpha * CE_loss + (1 - alpha) * DC_loss
+        loss.requires_grad_(True)
+        return loss
+
+
+if __name__ == '__main__':
+    y = torch.randn((1, 16, 256, 256, 68))
+    y_ = F.softmax(y, 1)
+    y_p = torch.randn((1, 16, 256, 256, 68))
+    y_p_ = F.softmax(y_p, 1)
+    print(y.shape)
+    loss = ComboLoss(weight=[1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5])
+    l = loss(y_, y_p_)
