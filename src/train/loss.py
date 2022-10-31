@@ -78,35 +78,37 @@ class ComboLoss(nn.Module):
         super(ComboLoss, self).__init__()
         self.weight = weight
 
-    def dice_loss(self, target, predictive, ep=1e-8):
-        intersection = 2. * torch.sum(predictive * target) + ep
-        union = torch.sum(predictive) + torch.sum(target) + ep
-        loss = 1 - intersection / union
-        return loss
+    def combo(self, inputs, targets, smooth=1, eps=1e-9):
+        CE_RATIO = 0.5
+        ALPHA = 0.5
+        inputs = inputs.reshape(-1)
+        targets = targets.reshape(-1)
+        # True Positives, False Positives & False Negatives
+        intersection = (inputs * targets).sum()
+        dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
+
+        # inputs = torch.clamp(inputs, eps, 1.0 - eps)
+        out = F.binary_cross_entropy(inputs, targets, reduction='mean')
+        weighted_ce = out.mean(-1)
+        combo = (CE_RATIO * weighted_ce) + ((1 - CE_RATIO) * (1 - dice))
+
+        return combo
 
     def forward(self, pred, true):
-        alpha = 0.5
+
         if len(self.weight) != pred.shape[1]:
             print('shape is not mapping')
             exit()
+
         wei_sum = sum(self.weight)
-        CE_loss = 0.
-        DC_loss = 0.
         batch_size = pred.shape[0]
+        loss = 0.
         for b in range(batch_size):
             for i, class_weight in enumerate(self.weight):
                 pred_i = pred[:, i]
                 true_i = true[:, i]
-                CE_loss += (
-                        class_weight / wei_sum * F.binary_cross_entropy(pred_i, true_i, reduction='mean')
-                )
-                DC_loss += (
-                        class_weight / wei_sum * self.dice_loss(pred_i, true_i)
-                )
-        DC_loss = DC_loss / batch_size
-        CE_loss = CE_loss / batch_size
-        loss = alpha * CE_loss + (1 - alpha) * DC_loss
-        loss.requires_grad_(True)
+                loss += (class_weight / wei_sum) * self.combo(pred_i, true_i)
+        loss = self.combo(pred, true)
         return loss
 
 
