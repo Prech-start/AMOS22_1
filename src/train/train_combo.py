@@ -130,7 +130,7 @@ if __name__ == '__main__':
     if is_load:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-new.pth')))
     if is_move:
-        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-210.pth')))
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-final.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss = ComboLoss(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

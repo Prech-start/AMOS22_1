@@ -199,7 +199,7 @@ if __name__ == '__main__':
     class_num = 16
     learning_rate = 1e-4
     max_epoch = 300
-    model = UnetModel_centre(1, class_num, 6)
+    model = UnetModel_centre(1, class_num)
     strategy = 'centre+combo'
     # 是否加载模型
     is_load = False
