@@ -12,14 +12,15 @@ def save_loss(t_loss, v_loss, v_acc, filename='tem'):
         pickle.dump(np.array([t_loss, v_loss, v_acc]), f)
 
 
-def pic_loss_line():
-    with open(os.path.join('tem.tmp'), 'rb+') as f:
+def pic_loss_line(filename='tem'):
+    with open(os.path.join('{}.tmp').format(filename), 'rb+') as f:
         loss_ = pickle.load(f)
         len_train = len(loss_[0])
         train_loss, valid_loss, valid_acc = loss_[0], loss_[1], loss_[2]
         plt.plot([i for i in range(len_train)], train_loss, '-', label='train_loss')
         plt.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss')
         plt.legend()
+        plt.show()
         plt.savefig('loss_line_final.png', bbox_inches='tight')
 
 
@@ -28,23 +29,22 @@ def pic_loss_acc(filename='tem'):
         loss_ = pickle.load(f)
         len_train = len(loss_[0])
         train_loss, valid_loss, valid_acc = loss_[0], loss_[1], loss_[2]
-
         fig, ax = plt.subplots()
         ax2 = ax.twinx()
         lin1 = ax.plot([i for i in range(len_train)], train_loss, '-', label='train_loss', color='blue')
-        lin2 = ax.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss', color='green')
-
+        lin2 = ax.plot([i for i in range(len_train)], valid_loss, '-', label='valid_loss', color='orange')
         ax.set_xlabel('epochs')
         ax.set_ylabel('loss')
         ax2.set_ylabel('dice')
-
-        lin3 = ax2.plot([i for i in range(len_train)], valid_acc, '-', label='dice', color='black')
+        lin3 = ax2.plot([i for i in range(len_train)], valid_acc, '-', label='dice', color='red')
         lins = lin1 + lin2 + lin3
         labs = [l.get_label() for l in lins]
-
-        plt.figure(figsize=(8, 8), dpi=100)
         plt.legend(lins, labs, loc='best')
+        # plt.show()
         plt.savefig('{}.png'.format(filename), bbox_inches='tight')
+        plt.close()
+        f.close()
 
 
-# pic_loss_acc()
+if __name__ == '__main__':
+    pic_loss_acc('combo')

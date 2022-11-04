@@ -1,13 +1,41 @@
+import os.path
+import pickle
+import time
+
 import SimpleITK as sitk
 import numpy as np
-from image_process import concat_image2
 
 
-def cut_(ori_path, gt_path):
+def cut_(ori_path, gt_path, save_path, spacing=None):
+    start_time = time.time()
     ori_image = np.array(sitk.GetArrayFromImage(sitk.ReadImage(ori_path)))
     gt_image = np.array(sitk.GetArrayFromImage(sitk.ReadImage(gt_path)))
-    ori_image = norm(ori_image)
-    concat_image2(ori_image * 255, gt_image, gt_path, 48)
+    if np.min(ori_image) < 0:
+        pre_cut_ori_image = norm(ori_image).squeeze()
+    else:
+        pre_cut_ori_image = ori_image.squeeze()
+    x_list, y_list, z_list = np.where(pre_cut_ori_image > 0)
+    x_max, y_max, z_max = np.max(x_list), np.max(y_list), np.max(z_list)
+    x_min, y_min, z_min = np.min(x_list), np.min(y_list), np.min(z_list)
+    print('from shape:{}'.format(ori_image.shape))
+    cut_ori_image = ori_image[x_min:x_max, y_min:y_max, z_min:z_max]
+    print('to {} '.format(cut_ori_image.shape))
+    cut_gt_image = gt_image[x_min:x_max, y_min:y_max, z_min:z_max]
+    spacing = spacing if not spacing == None else sitk.ReadImage(ori_path).GetSpacing()
+    information = [spacing, x_max, y_max, z_max, x_min, y_min, z_min]
+    import save_nii
+    ori_file_name = ori_path.split('/')[-1]
+    gt_file_name = gt_path.split('/')[-1]
+    if not os.path.exists(os.path.join(save_path, 'inf')) or not os.path.exists(
+            os.path.join(save_path, 'tr_ori')) or not os.path.exists(os.path.join(save_path, 'tr_gt')):
+        os.makedirs(os.path.join(save_path, 'inf'))
+        os.makedirs(os.path.join(save_path, 'tr_ori'))
+        os.makedirs(os.path.join(save_path, 'tr_gt'))
+    save_nii.np2nii(cut_ori_image, spacing=information[0], outDir=os.path.join(save_path, 'tr_ori', ori_file_name))
+    save_nii.np2nii(cut_gt_image, spacing=information[0], outDir=os.path.join(save_path, 'tr_gt', gt_file_name))
+    pickle.dump(information,
+                open(os.path.join(save_path, 'inf', '{}.inf'.format(gt_file_name.split('.')[0])), 'wb+'))
+    print('processed: from xx shape to xx shape, costed {} s.'.format(time.time() - start_time))
 
 
 def norm(x):
@@ -22,5 +50,12 @@ def norm(x):
 
 
 if __name__ == '__main__':
-    ori_path, gt_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr/amos_0001.nii.gz', '/home/ljc/code/AMOS22/data/AMOS22/labelsTr/amos_0001.nii.gz'
-    cut_(ori_path, gt_path)
+    # ori_path, gt_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr/amos_0001.nii.gz', '/home/ljc/code/AMOS22/data/AMOS22/labelsTr/amos_0001.nii.gz'
+    # cut_(ori_path, gt_path, '/home/ljc/code/AMOS22/data/AMOS22/')
+    ori_paths = os.listdir('/home/ljc/code/AMOS22/data/AMOS22/imagesTr/')
+    gt_paths = os.listdir('/home/ljc/code/AMOS22/data/AMOS22/labelsTr/')
+    ori_paths.sort()
+    gt_paths.sort()
+    for ori_path, gt_path in zip(ori_paths, gt_paths):
+        cut_(os.path.join('/home/ljc/code/AMOS22/data/AMOS22/imagesTr/', ori_path),
+             os.path.join('/home/ljc/code/AMOS22/data/AMOS22/labelsTr/', gt_path), '/home/ljc/code/AMOS22/data/AMOS22/')

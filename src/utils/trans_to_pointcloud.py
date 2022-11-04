@@ -77,8 +77,9 @@ def cal_centre_point(ori_file_path, label_file_path, r):
 def cal_centre_point_2(label_arr, label_file_path, r):
     start_time = time.time()
     file_name = label_file_path.split('/')[-1].split('.')[0]
-    save_path = '/home/ljc/code/AMOS22/data/pointcloud/{}.npy'.format(file_name)
-    if not os.path.exists(os.path.join('/home/ljc/code/AMOS22/data/pointcloud', '{}.npy'.format(file_name))):
+    path_dir = os.path.dirname(__file__)
+    save_path = os.path.join(path_dir, '..', '..', 'data', 'pointcloud', '{}.npy'.format(file_name))
+    if not os.path.exists(save_path):
         centre_arr = np.zeros_like(label_arr).astype(np.float32)
         for i in np.unique(label_arr).tolist():
             if i == 0:

@@ -112,6 +112,96 @@ class ComboLoss(nn.Module):
         return loss
 
 
+class ComboLoss2(nn.Module):
+    def __init__(self, weight):
+        super(ComboLoss2, self).__init__()
+        self.weight = weight
+        self.n_classes = len(weight)
+        self.CE_Crit = nn.CrossEntropyLoss(weight=torch.Tensor(self.weight))
+
+    def Generalized_Dice_Loss(self, input, target, class_weights, smooth=1e-6):
+        '''
+        inputs:
+            y_pred [batch, n_classes, x, y, z] probability
+            y_true [batch, n_classes, x, y, z] one-hot code
+            class_weights
+            smooth = 1.0
+        '''
+        # smooth = 1e-6
+        loss = 0.
+        batch_size = input.size(0)
+        class_weights = torch.Tensor(self.weight).to(input.device)
+        # for b in range(batch_size):
+        #     for c in range(n_classes):  # pass 0 because 0 is background
+        #         pred_flat = y_pred[b, c].view(-1)
+        #         true_flat = y_true[b, c].view(-1)
+        #         inter = torch.sum(pred_flat * true_flat) + smooth
+        #         union = torch.sum(pred_flat) + torch.sum(true_flat) + smooth
+        #         # with weight
+        #         w = class_weights[c] / class_weights.sum()
+        #         loss += w * (1.0 - ((2.0 * inter ) /
+        #                             ()))
+        input = F.softmax(input, dim=1).view(batch_size, self.n_classes, -1)
+        target = target.contiguous().view(batch_size, self.n_classes, -1)
+
+        inter = torch.sum(input * target, 2) + smooth
+        union = torch.sum(input, 2) + torch.sum(target, 2) + smooth
+
+        score = torch.sum(2.0 * inter / union * class_weights / class_weights.sum())
+        score = 1.0 - score / (float(batch_size)) * float(self.n_classes)
+        return score
+
+    def forward(self, pred, true, ALPHA=0.5):
+        if len(self.weight) != pred.shape[1]:
+            print('shape is not mapping')
+            exit()
+
+        DC = self.Generalized_Dice_Loss(pred, true, self.weight)
+        CE = self.CE_Crit(pred, torch.argmax(true, 1))
+        return (1 - ALPHA) * DC + ALPHA * CE
+
+
+class One_Hot(nn.Module):
+    def __init__(self, depth=2):
+        super(One_Hot, self).__init__()
+        self.depth = depth
+        self.ones = torch.sparse.torch.eye(depth).cuda()
+
+    def forward(self, X_in):
+        n_dim = X_in.dim()
+        output_size = X_in.size() + torch.Size([self.depth])
+        num_element = X_in.numel()
+        X_in = X_in.data.long().view(num_element)
+        out = Variable(self.ones.index_select(0, X_in)).view(output_size)
+        return out.permute(0, -1, *range(1, n_dim)).squeeze(dim=2).float()
+
+    def __repr__(self):
+        return self.__class__.__name__ + "({})".format(self.depth)
+
+
+class SoftDiceLoss(nn.Module):
+    def __init__(self, n_classes=2):
+        super(SoftDiceLoss, self).__init__()
+        self.one_hot_encoder = One_Hot(n_classes).forward
+        self.n_classes = n_classes
+
+    def forward(self, input, target):
+        smooth = 0.1
+        batch_size = input.size(0)
+
+        input = F.softmax(input, dim=1).view(batch_size, self.n_classes, -1)
+        target = self.one_hot_encoder(target).contiguous().view(batch_size, self.n_classes, -1)
+        # print("max::::", torch.max(input), "min::::", torch.min(input))
+        # print("max::::", torch.max(target), "min::::", torch.min(target))
+        inter = torch.sum(input * target, 2) + smooth
+        union = torch.sum(input, 2) + torch.sum(target, 2) + smooth
+
+        score = torch.sum(2.0 * inter / union)
+        score = 1.0 - score / (float(batch_size) * float(self.n_classes))
+
+        return score
+
+
 if __name__ == '__main__':
     y = torch.randn((1, 16, 256, 256, 68))
     y_ = F.softmax(y, 1)
@@ -120,3 +210,4 @@ if __name__ == '__main__':
     print(y.shape)
     loss = ComboLoss(weight=[1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5])
     l = loss(y_, y_p_)
+    print(l.item())

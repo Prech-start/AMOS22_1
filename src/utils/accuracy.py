@@ -156,8 +156,8 @@ def calculate_acc(output, target, class_num, fun, is_training=False):
         pred = pred[..., i]
         true = true[..., i]
         acc.append(fun(pred, true))
-    pred = output.data.squeeze().numpy().astype(bool)
-    true = target.data.squeeze().numpy().astype(bool)
+    pred = output.data.squeeze().cpu().numpy().astype(bool)
+    true = target.data.squeeze().cpu().numpy().astype(bool)
     acc.append(fun(pred, true))
     return acc
 
@@ -271,7 +271,6 @@ def cal_nnunet_dice():
 
 from tqdm import tqdm
 import pandas as pd
-from src.process.task2_data_loader import get_train_or_test_data as get_dataloader
 
 
 # model = UnetModel(1, 16, 6)

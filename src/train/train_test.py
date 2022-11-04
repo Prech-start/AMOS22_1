@@ -1,31 +1,14 @@
-import os, sys
-import time
+import sys
 
-from torch.autograd import Variable
-import matplotlib.pyplot as plt
 import torch
-from matplotlib.pyplot import plot
-import numpy as np
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from src.process.data_load import *
-from src.model.model import *
 from einops import *
-from tqdm import tqdm
-from torch.nn.functional import one_hot
-import copy
-from src.utils.image_process import save_image_information
 from src.utils.train_utils import *
-import gc
 from src.train.loss import *
 
 sys.path.append('..')
 from src.utils.accuracy import *
-import src.process.task2_data_loader as task2_data_loader
-import src.process.task2_sliding_window as task2_sliding_window
 import src.process.task2_data_loader as loader
-import einops
+from src.model.model_test import *
 
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
@@ -37,6 +20,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
     # ---------------------------------------------------
     model.train()
     model.to(device)
+    criterion.to(device)
     for index, (data, y) in enumerate(train_loader):
         # train_data
         optimizer.zero_grad()
@@ -55,6 +39,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
     print()
     model.eval()
     model.cpu()
+    criterion.cpu()
     for index, (data, y) in enumerate(valid_loader):
         # valid data
         y = torch.LongTensor(y.long())
@@ -85,6 +70,9 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
     if is_load:
         with open(os.path.join('{}.tmp'.format(strategy)), 'rb+') as f:
             train_loss, valid_loss, valid_acc = pickle.load(f)
+            train_loss = train_loss.tolist()
+            valid_loss = valid_loss.tolist()
+            valid_acc = valid_acc.tolist()
             max_acc = 0.5
     else:
         train_loss = []
@@ -116,13 +104,14 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
     return pre_train_model
 
 
-if __name__ == '__main__':
+def run():
     print('beginning training')
     class_num = 16
-    learning_rate = 1e-4
+    learning_rate = 3e-4
     epoch = 300
-    strategy = 'combo'
-    model = UnetModel(1, class_num)
+    device = torch.device('cuda:0')
+    strategy = 'no_combo'
+    model = UnetModel(1, class_num, 6)
     # 是否加载模型
     is_load = False
     # 是否迁移模型
@@ -132,9 +121,12 @@ if __name__ == '__main__':
     if is_move:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-final.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-    loss = ComboLoss2(loss_weight)
-    loss = loss.to(device=torch.device('cuda:0'))
+    loss = BCELoss_with_weight(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # norm2 = 2028min
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
                   device=torch.device('cuda:0'), is_load=is_load, strategy=strategy)
+
+
+if __name__ == '__main__':
+    run()
