@@ -119,7 +119,7 @@ class ComboLoss2(nn.Module):
         self.n_classes = len(weight)
         self.CE_Crit = nn.CrossEntropyLoss(weight=torch.Tensor(self.weight))
 
-    def Generalized_Dice_Loss(self, input, target, class_weights, smooth=1e-6):
+    def Generalized_Dice_Loss(self, input, target, smooth=1e-6):
         '''
         inputs:
             y_pred [batch, n_classes, x, y, z] probability
@@ -131,16 +131,6 @@ class ComboLoss2(nn.Module):
         loss = 0.
         batch_size = input.size(0)
         class_weights = torch.Tensor(self.weight).to(input.device)
-        # for b in range(batch_size):
-        #     for c in range(n_classes):  # pass 0 because 0 is background
-        #         pred_flat = y_pred[b, c].view(-1)
-        #         true_flat = y_true[b, c].view(-1)
-        #         inter = torch.sum(pred_flat * true_flat) + smooth
-        #         union = torch.sum(pred_flat) + torch.sum(true_flat) + smooth
-        #         # with weight
-        #         w = class_weights[c] / class_weights.sum()
-        #         loss += w * (1.0 - ((2.0 * inter ) /
-        #                             ()))
         input = F.softmax(input, dim=1).view(batch_size, self.n_classes, -1)
         target = target.contiguous().view(batch_size, self.n_classes, -1)
 
