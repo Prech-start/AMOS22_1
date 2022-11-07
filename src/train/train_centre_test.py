@@ -118,9 +118,9 @@ def run():
     # 是否迁移模型
     is_move = False
     if is_load:
-        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-180.pth')))
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-new.pth')))
     if is_move:
-        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-210.pth')))
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-final.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss = BCELoss_with_weight(loss_weight)
     loss_centre = torch.nn.L1Loss()
@@ -128,4 +128,4 @@ def run():
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     model = train(pre_train_model=model, n_epochs=max_epoch, batch_size=1, optimizer=optimizer,
                   criterion=[loss, loss_centre],
-                  device=torch.device('cpu'), is_load=is_load, strategy=strategy)
+                  device=torch.device('cuda:0'), is_load=is_load, strategy=strategy)

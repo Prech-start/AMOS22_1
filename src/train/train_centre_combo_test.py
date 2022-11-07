@@ -25,6 +25,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
     # ---------------------------------------------------
     model.train()
     model.to(device)
+    criterion.to(device)
     for index, (data, GT, GT_centre) in enumerate(train_loader):
         # train_data
         optimizer.zero_grad()
@@ -49,6 +50,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
     print()
     model.eval()
     model.cpu()
+    criterion.cpu()
     for index, (data, GT, GT_centre) in enumerate(valid_loader):
         # valid data
         GT = torch.LongTensor(GT.long())
@@ -71,7 +73,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
 
 def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, is_load, strategy):
     path_dir = os.path.dirname(__file__)
-    path = os.path.join(path_dir, '..', 'checkpoints', 'auto_save_task2_{}'.format(strategy))
+    path = os.path.join(path_dir, '..', 'checkpoints', strategy)
     if not os.path.exists(path):
         os.makedirs(path)
     train_loader = loader.get_train_data(batch_size=batch_size)
@@ -124,11 +126,11 @@ def run():
     # 是否迁移模型
     is_move = False
     if is_load:
-        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-180.pth')))
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-new.pth')))
     if is_move:
-        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'auto_save', 'Unet-210.pth')))
+        model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-final.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-    loss = ComboLoss(loss_weight)
+    loss = ComboLoss2(loss_weight)
     loss_centre = torch.nn.L1Loss()
     # 150 768min
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

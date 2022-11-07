@@ -151,6 +151,45 @@ class ComboLoss2(nn.Module):
         return (1 - ALPHA) * DC + ALPHA * CE
 
 
+class ComboLoss3(nn.Module):
+    def __init__(self, weight, alpha=0.5):
+        super(ComboLoss3, self).__init__()
+        self.weight = weight
+        self.n_classes = len(weight)
+        self.CE_Crit = BCELoss_with_weight(weight)
+        self.ALPHA = alpha
+    def Generalized_Dice_Loss(self, input, target, smooth=1e-6):
+        '''
+        inputs:
+            y_pred [batch, n_classes, x, y, z] probability
+            y_true [batch, n_classes, x, y, z] one-hot code
+            class_weights
+            smooth = 1.0
+        '''
+        # smooth = 1e-6
+        loss = 0.
+        batch_size = input.size(0)
+        class_weights = torch.Tensor(self.weight).to(input.device)
+        input = F.softmax(input, dim=1).view(batch_size, self.n_classes, -1)
+        target = target.contiguous().view(batch_size, self.n_classes, -1)
+
+        inter = torch.sum(input * target, 2) + smooth
+        union = torch.sum(input, 2) + torch.sum(target, 2) + smooth
+
+        score = torch.sum(2.0 * inter / union * class_weights / class_weights.sum())
+        score = 1.0 - score / (float(batch_size)) * float(self.n_classes)
+        return score
+
+    def forward(self, pred, true):
+        if len(self.weight) != pred.shape[1]:
+            print('shape is not mapping')
+            exit()
+
+        DC = self.Generalized_Dice_Loss(pred, true)
+        CE = self.CE_Crit(pred, true)
+        return (1 - self.ALPHA) * DC + self.ALPHA * CE
+
+
 class One_Hot(nn.Module):
     def __init__(self, depth=2):
         super(One_Hot, self).__init__()

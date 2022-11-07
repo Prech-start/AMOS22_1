@@ -105,15 +105,14 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
 
 
 def run():
-    print('beginning training')
     class_num = 16
     learning_rate = 6e-4
     epoch = 300
     device = torch.device('cuda:0')
-    strategy = 'combo'
+    strategy = 'combo2'
     model = UnetModel(1, class_num, 6)
     # 是否加载模型
-    is_load = True
+    is_load = False
     # 是否迁移模型
     is_move = False
     if is_load:
@@ -122,9 +121,10 @@ def run():
     if is_move:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-final.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-    loss = ComboLoss2(loss_weight)
+    loss = ComboLoss3(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # norm2 = 2028min
+    print('beginning training {}'.format(strategy))
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
                   device=torch.device('cuda:0'), is_load=is_load, strategy=strategy)
 
