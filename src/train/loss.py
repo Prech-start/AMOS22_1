@@ -69,7 +69,7 @@ class BCELoss_with_weight(nn.Module):
                 weight_loss += (
                         class_weight / wei_sum * F.binary_cross_entropy(pred_i, true_i, reduction='mean'))
         weight_loss = weight_loss / batch_size
-        weight_loss.requires_grad_(True)
+        # weight_loss.requires_grad_(True)
         return weight_loss
 
 
@@ -138,7 +138,7 @@ class ComboLoss2(nn.Module):
         union = torch.sum(input, 2) + torch.sum(target, 2) + smooth
 
         score = torch.sum(2.0 * inter / union * class_weights / class_weights.sum())
-        score = 1.0 - score / (float(batch_size)) * float(self.n_classes)
+        score = 1.0 - score / (float(batch_size) * float(self.n_classes))
         return score
 
     def forward(self, pred, true, ALPHA=0.5):
@@ -177,7 +177,7 @@ class ComboLoss3(nn.Module):
         union = torch.sum(input, 2) + torch.sum(target, 2) + smooth
 
         score = torch.sum(2.0 * inter / union * class_weights / class_weights.sum())
-        score = 1.0 - score / (float(batch_size)) * float(self.n_classes)
+        score = 1.0 - score / (float(batch_size) * float(self.n_classes))
         return score
 
     def forward(self, pred, true):

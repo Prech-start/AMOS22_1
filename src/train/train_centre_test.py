@@ -53,9 +53,9 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
         # training param
         output, _ = model(data.float())
         loss = loss_dice(output, target.float())
-        v_acc.append(np.mean(
-            calculate_acc(torch.argmax(output, dim=1), torch.argmax(target, dim=1), class_num=16, fun=DICE,
-                          is_training=True)))
+        v_acc.append(
+            calculate_acc(output, target, class_num=16, fun=DICE,
+                          is_training=True))
         v_loss.append(loss.item())
         print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(valid_loader), loss.item()), end="")
     # ----------------------------------------------------

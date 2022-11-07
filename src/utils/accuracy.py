@@ -132,30 +132,17 @@ def Sensitivity(output, target):
            (target.sum() + smooth)
 
 
-def calculate_acc(output, target, class_num, fun, is_training=False):
-    # input: class_tensor
-    # output, target's shape b c w h d
-    # return: 每一个通道所计算出来的指标的值
-    # 将每一个通道都做一次acc计算
-    acc = []
-    if len(torch.unique(output)) != len(torch.unique(target)):
-        # print('error')
-        pass
+def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4):
     # HD_95计算库的dtype为np.numeric
-    dtype_ = bool
-    for i in range(class_num):
-        # 跳过background
-        if i == 0:
-            continue
-        if is_training:
-            break
-        pred = copy.deepcopy(output.data.squeeze().numpy())
-        true = copy.deepcopy(target.data.squeeze().numpy())
-        pred = one_hot(torch.LongTensor(pred), 16).numpy().astype(dtype_)
-        true = one_hot(torch.LongTensor(true), 16).numpy().astype(dtype_)
-        pred = pred[..., i]
-        true = true[..., i]
-        acc.append(fun(pred, true))
+    batch_size = output.size(0)
+    input = output.contiguous().view(batch_size, class_num, -1)
+    target = target.contiguous().view(batch_size, class_num, -1)
+
+    inter = torch.sum(input * target, 2) + smooth
+    union = torch.sum(input, 2) + torch.sum(target, 2) + smooth
+
+    score = torch.sum(2.0 * inter / union)
+    acc = score / (float(batch_size) * float(class_num))
     return acc
 
 
@@ -294,17 +281,19 @@ def cal_dice():
     test_dataset = get_test_set()
     test_centre_dataset = get_centre_test_set()
     model_basic = UnetModel(1, 16, 6)
-    model_basic.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'combo', 'Unet-final.pth')))
+    model_basic.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'combo2', 'Unet-final.pth')))
     acc_combo = calculate_dice_all(test_dataset, model_basic)
 
-    model_basic = UnetModel(1, 16, 6)
-    model_basic.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'no_combo', 'Unet-final.pth')))
-    acc_no_combo = calculate_dice_all(test_dataset, model_basic)
+    # model_basic = UnetModel(1, 16, 6)
+    # model_basic.load_state_dict(torch.load(os.path.join('..', 'checkpoints', 'no_combo', 'Unet-final.pth')))
+    # acc_no_combo = calculate_dice_all(test_dataset, model_basic)
+    acc_no_combo = acc_combo
 
-    model_centre = UnetModel_centre(1, 16, 6)
-    model_centre.load_state_dict(
-        torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_centre+combo', 'Unet-final.pth')))
-    acc_centre_combo = calculate_dice_all_centre(test_dataset, model_centre)
+    # model_centre = UnetModel_centre(1, 16, 6)
+    # model_centre.load_state_dict(
+    #     torch.load(os.path.join('..', 'checkpoints', 'auto_save_task2_centre+combo', 'Unet-final.pth')))
+    # acc_centre_combo = calculate_dice_all_centre(test_dataset, model_centre)
+    acc_centre_combo = acc_combo
 
     dices_combo = []
     dices_no_combo = []
