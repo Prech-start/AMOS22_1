@@ -143,7 +143,7 @@ def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4
 
     score = torch.sum(2.0 * inter / union)
     acc = score / (float(batch_size) * float(class_num))
-    return acc
+    return acc.item()
 
 
 def calculate_dice_all(test_loader, model):
