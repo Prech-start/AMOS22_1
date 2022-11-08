@@ -109,7 +109,7 @@ def run():
     learning_rate = 6e-4
     epoch = 300
     device = torch.device('cuda:0')
-    strategy = 'combo2'
+    strategy = 'combo2_1e-3'
     model = UnetModel(1, class_num, 6)
     # 是否加载模型
     is_load = False
