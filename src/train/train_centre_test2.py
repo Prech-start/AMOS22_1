@@ -5,7 +5,7 @@ from src.train.loss import *
 
 sys.path.append('..')
 from src.utils.accuracy import *
-import src.process.task2_data_loader_centre as loader
+import src.process.task2_data_loader_centre2 as loader
 
 
 def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterion):
@@ -32,14 +32,13 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
         output, out_centre = model(Variable(data))
         GT = GT.to(device)
         loss_ = loss_dice(output, GT.float())
-        GT_centre = GT_centre.unsqueeze(0)
         GT_centre = GT_centre.to(device)
         # print(out_centre.shape, GT_centre.shape)
         loss_centre = loss_L1(out_centre, GT_centre.float())
         loss = (1 - weight) * loss_ + weight * loss_centre
         loss.backward()
         optimizer.step()
-        t_loss.append(loss.item())
+        t_loss.append(loss_.item())
         print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
     print()
     model.eval()
@@ -111,8 +110,8 @@ def run():
     class_num = 16
     learning_rate = 1e-4
     max_epoch = 300
-    model = UnetModel_centre(1, class_num, 6)
-    strategy = 'centre_test'
+    model = UnetModel_centre2(1, class_num, 6)
+    strategy = 'centre_test2'
     # 是否加载模型
     is_load = False
     # 是否迁移模型
@@ -129,3 +128,7 @@ def run():
     model = train(pre_train_model=model, n_epochs=max_epoch, batch_size=1, optimizer=optimizer,
                   criterion=[loss, loss_centre],
                   device=torch.device('cuda:0'), is_load=is_load, strategy=strategy)
+
+
+if __name__ == '__main__':
+    run()
