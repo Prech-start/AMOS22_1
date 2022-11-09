@@ -106,10 +106,10 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
 
 def run():
     class_num = 16
-    learning_rate = 6e-4
+    learning_rate = 1e-4
     epoch = 300
     device = torch.device('cuda:0')
-    strategy = 'combo2_1e-3'
+    strategy = 'combo2_1e-3_ndice'
     model = UnetModel(1, class_num, 6)
     # 是否加载模型
     is_load = False

@@ -158,7 +158,8 @@ class ComboLoss3(nn.Module):
         self.n_classes = len(weight)
         self.CE_Crit = BCELoss_with_weight(weight)
         self.ALPHA = alpha
-    def Generalized_Dice_Loss(self, input, target, smooth=1e-6):
+
+    def dice_loss(self, y_pred, y_true, smooth=1e-6):
         '''
         inputs:
             y_pred [batch, n_classes, x, y, z] probability
@@ -168,24 +169,26 @@ class ComboLoss3(nn.Module):
         '''
         # smooth = 1e-6
         loss = 0.
-        batch_size = input.size(0)
-        class_weights = torch.Tensor(self.weight).to(input.device)
-        input = F.softmax(input, dim=1).view(batch_size, self.n_classes, -1)
-        target = target.contiguous().view(batch_size, self.n_classes, -1)
-
-        inter = torch.sum(input * target, 2) + smooth
-        union = torch.sum(input, 2) + torch.sum(target, 2) + smooth
-
-        score = torch.sum(2.0 * inter / union * class_weights / class_weights.sum())
-        score = 1.0 - score / (float(batch_size) * float(self.n_classes))
-        return score
+        n_classes = y_pred.shape[1]
+        batch_size = y_pred.shape[0]
+        class_weights = np.asarray(self.weight, dtype=float)
+        for b in range(batch_size):
+            for c in range(n_classes):
+                pred_flat = y_pred[b, c, ...]
+                true_flat = y_true[b, c, ...]
+                intersection = (pred_flat * true_flat).sum()
+                # with weight
+                w = class_weights[c] / class_weights.sum()
+                loss += w * (1 - ((2. * intersection + smooth) /
+                                  (pred_flat.sum() + true_flat.sum() + smooth)))
+        return loss / batch_size
 
     def forward(self, pred, true):
         if len(self.weight) != pred.shape[1]:
             print('shape is not mapping')
             exit()
 
-        DC = self.Generalized_Dice_Loss(pred, true)
+        DC = self.dice_loss(pred, true)
         CE = self.CE_Crit(pred, true)
         return (1 - self.ALPHA) * DC + self.ALPHA * CE
 
