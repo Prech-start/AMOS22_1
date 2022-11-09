@@ -110,7 +110,7 @@ def cal_centre_point_3(label_arr, label_file_path, r):
     start_time = time.time()
     file_name = label_file_path.split('/')[-1].split('.')[0]
     path_dir = os.path.dirname(__file__)
-    file_path = os.path.join(path_dir, '..', '..', 'data', 'pointcloud2')
+    file_path = os.path.join(path_dir, '..', '..', 'data', 'pointcloud3')
     if not os.path.exists(file_path):
         os.makedirs(file_path)
     save_path = os.path.join(file_path, '{}.npy'.format(file_name))
@@ -121,19 +121,20 @@ def cal_centre_point_3(label_arr, label_file_path, r):
             if i == 0:
                 continue
             class_xyz = np.array(np.where(label_arr_[i, ...] == 1))
-            channel_xyz = np.ones((1, class_xyz.shape[-1])) * i
-            class_xyz = np.r_[channel_xyz, class_xyz].astype(int)
+            class_all = np.array(np.where(label_arr_[i, ...] != -1))
+            class_xyz = np.r_[np.ones((1, class_xyz.shape[-1])) * i, class_xyz].astype(int)
+            class_all = np.r_[np.ones((1, class_all.shape[-1])) * i, class_all].astype(int)
             c, x, y, z = np.mean(class_xyz, 1, dtype=int)
             # 求中心点坐标
             centre_arr[i, x, y, z] = 1
             # 求每个label点到中心的点的距离
-            distance_for_xyz = np.linalg.norm(class_xyz.T - [i, x, y, z], axis=1)  # N * 1
+            distance_for_xyz = np.linalg.norm(class_all.T - [i, x, y, z], axis=1)  # N * 1
             # 筛选出distance中距离小于r的所有坐标 type:tuple
             dis = np.where(distance_for_xyz < r)
             # 筛选出到中心点距离小于r的所有坐标
             distance_list = distance_for_xyz[dis]
             # 将每个筛选出的点进行赋值
-            centre_arr[tuple(class_xyz.T[dis].T.tolist())] = r - distance_list
+            centre_arr[tuple(class_all.T[dis].T.tolist())] = r - distance_list
         np.save(save_path, centre_arr)
         print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
         return centre_arr
