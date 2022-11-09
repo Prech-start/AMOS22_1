@@ -108,6 +108,6 @@ def get_test_data():
 import torchvision.transforms as transforms
 
 if __name__ == '__main__':
-    d = get_train_data()
+    d = get_test_data()
     for i, j, k in d:
         print(k.shape)

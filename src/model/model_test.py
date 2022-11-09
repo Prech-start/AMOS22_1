@@ -140,6 +140,29 @@ class UnetModel_centre(nn.Module):
         # print("Final output shape: ", x.shape)
         return seg_x, centre_x
 
+class UnetModel_centre2(nn.Module):
+    def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
+        super(UnetModel_centre2, self).__init__()
+        self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
+        self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
+        # self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
+        self.softmax = nn.Softmax(dim=1)
+        self.sigmoid = nn.Sigmoid()
+        self.conv_seg = nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=3,
+                                  stride=1, padding=1)
+        self.conv_centre = nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=3,
+                                     stride=1, padding=1)
+
+    def forward(self, x):
+        x, downsampling_features = self.encoder(x)
+        x = self.decoder(x, downsampling_features)
+        x = F.elu(x)
+        seg_x = self.conv_seg(x)
+        centre_x = self.conv_centre(x)
+        seg_x = self.softmax(seg_x)
+        centre_x = self.softmax(centre_x)
+        # print("Final output shape: ", x.shape)
+        return seg_x, centre_x
 
 class UnetModel(nn.Module):
 
