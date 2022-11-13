@@ -30,7 +30,7 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
         y = one_hot(y, 16)
         target = rearrange(y, 'b d w h c -> b c d w h')
         # training param
-        output = model(Variable(data))
+        output = model(data)
         loss = criterion(output, target.float())
         loss.backward()
         optimizer.step()
@@ -106,10 +106,10 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
 
 def run():
     class_num = 16
-    learning_rate = 1e-4
+    learning_rate = 1e-5
     epoch = 300
     device = torch.device('cuda:0')
-    strategy = 'combo2_1e-3_ndice'
+    strategy = 'combo_kaggle_combo'
     model = UnetModel(1, class_num, 6)
     # 是否加载模型
     is_load = False
@@ -121,12 +121,12 @@ def run():
     if is_move:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-final.pth')))
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-    loss = ComboLoss3(loss_weight)
+    loss = ComboLoss4()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # norm2 = 2028min
     print('beginning training {}'.format(strategy))
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
-                  device=torch.device('cuda:0'), is_load=is_load, strategy=strategy)
+                  device=device, is_load=is_load, strategy=strategy)
 
 
 if __name__ == '__main__':

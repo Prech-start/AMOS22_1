@@ -113,12 +113,12 @@ class ComboLoss(nn.Module):
 
 
 class ComboLoss2(nn.Module):
-    def __init__(self, weight):
+    def __init__(self, weight, alpha=0.5):
         super(ComboLoss2, self).__init__()
         self.weight = weight
         self.n_classes = len(weight)
         self.CE_Crit = nn.CrossEntropyLoss(weight=torch.Tensor(self.weight))
-
+        self.alpha = alpha
     def Generalized_Dice_Loss(self, input, target, smooth=1e-6):
         '''
         inputs:
@@ -141,12 +141,12 @@ class ComboLoss2(nn.Module):
         score = 1.0 - score / (float(batch_size) * float(self.n_classes))
         return score
 
-    def forward(self, pred, true, ALPHA=0.5):
+    def forward(self, pred, true):
         if len(self.weight) != pred.shape[1]:
             print('shape is not mapping')
             exit()
-
-        DC = self.Generalized_Dice_Loss(pred, true, self.weight)
+        ALPHA = self.alpha
+        DC = self.Generalized_Dice_Loss(pred, true)
         CE = self.CE_Crit(pred, torch.argmax(true, 1))
         return (1 - ALPHA) * DC + ALPHA * CE
 
@@ -233,6 +233,28 @@ class SoftDiceLoss(nn.Module):
 
         return score
 
+
+class ComboLoss4(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(ComboLoss4, self).__init__()
+
+    def forward(self, inputs, targets, smooth=1, eps=1e-9):
+        ALPHA = 0.5  # < 0.5 penalises FP more, > 0.5 penalises FN more
+        CE_RATIO = 0.5  # weighted contribution of modified CE loss compared to Dice loss
+        # flatten label and prediction tensors
+        inputs = inputs.view(-1)
+        targets = targets.reshape(-1)
+
+        # True Positives, False Positives & False Negatives
+        intersection = (inputs * targets).sum()
+        dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
+
+        inputs = torch.clamp(inputs, eps, 1.0 - eps)
+        out = - (ALPHA * ((targets * torch.log(inputs)) + ((1 - ALPHA) * (1.0 - targets) * torch.log(1.0 - inputs))))
+        weighted_ce = out.mean(-1)
+        combo = (CE_RATIO * weighted_ce) - ((1 - CE_RATIO) * dice)
+
+        return combo
 
 if __name__ == '__main__':
     y = torch.randn((1, 16, 256, 256, 68))
