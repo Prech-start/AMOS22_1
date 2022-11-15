@@ -27,10 +27,9 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
         # trans y to onehot
         y = torch.LongTensor(y.long())
         data, y = data.float().to(device), y.to(device)
-        y = one_hot(y, 16)
-        target = rearrange(y, 'b d w h c -> b c d w h')
+        target = y.unsqueeze(1)
         # training param
-        output = model(Variable(data))
+        output = model(data)
         loss = criterion(output, target.float())
         loss.backward()
         optimizer.step()
@@ -43,13 +42,12 @@ def train_and_valid_model(epoch, model, data_loader, device, optimizer, criterio
     for index, (data, y) in enumerate(valid_loader):
         # valid data
         y = torch.LongTensor(y.long())
-        y = one_hot(y, 16)
-        target = rearrange(y, 'b d w h c -> b c d w h')
+        target = y.unsqueeze(1)
         # training param
         output = model(data.float())
         loss = criterion(output, target.float())
         v_acc.append(
-            calculate_acc(output, target, class_num=16, fun=DICE,
+            calculate_acc(output, target, class_num=2, fun=DICE,
                           is_training=True))
         v_loss.append(loss.item())
         print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(valid_loader), loss.item()), end="")
@@ -105,12 +103,12 @@ def train(pre_train_model, n_epochs, batch_size, optimizer, criterion, device, i
 
 
 def run():
-    class_num = 2
-    learning_rate = 1e-4
+    class_num = 1
+    learning_rate = 1e-3
     epoch = 300
     device = torch.device('cuda:0')
-    strategy = 'combo2_1e-4_liver'
-    model = UnetModel(1, class_num, 6)
+    strategy = 'combo2_1e-3_liver'
+    model = UnetModel(1, class_num, 6, final_activation='sigmoid')
     # 是否加载模型
     is_load = False
     # 是否迁移模型
@@ -120,13 +118,13 @@ def run():
             torch.load(os.path.join(os.path.dirname(__file__), '..', 'checkpoints', strategy, 'Unet-new.pth')))
     if is_move:
         model.load_state_dict(torch.load(os.path.join('..', 'checkpoints', strategy, 'Unet-final.pth')))
-    loss_weight = [1, 1]
+    loss_weight = [1]
     loss = ComboLoss3(loss_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # norm2 = 2028min
     print('beginning training {}'.format(strategy))
     model = train(pre_train_model=model, n_epochs=epoch, batch_size=1, optimizer=optimizer, criterion=loss,
-                  device=torch.device('cuda:0'), is_load=is_load, strategy=strategy)
+                  device=device, is_load=is_load, strategy=strategy)
 
 
 if __name__ == '__main__':

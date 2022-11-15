@@ -23,9 +23,9 @@ CT_test_path = file_path[160:200]
 MRI_train_path = file_path[200:230]
 MRI_valid_path = file_path[230:232]
 MRI_test_path = file_path[232::]
-train_path = CT_train_path + MRI_train_path
-valid_path = CT_valid_path + MRI_valid_path
-test_path = CT_test_path + MRI_test_path
+train_path = CT_train_path
+valid_path = CT_valid_path
+test_path = CT_test_path
 
 
 class data_set(Dataset):
@@ -40,6 +40,7 @@ class data_set(Dataset):
         y = np.array(y, dtype=int)
         # only liver
         y[y != 6] = 0
+        y[y == 6] = 1
         x = self.norm(x)
         x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
         y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
