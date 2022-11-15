@@ -18,11 +18,13 @@ import matplotlib.pyplot as plt
 
 ######################################################
 #################### DATALOADER ######################
-path_dir = os.path.dirname(__file__)
-task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
+# path_dir = os.path.dirname(__file__)
+# task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
+path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
+task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'task2_dataset.json')))
 
-file_path = [[os.path.join(path_dir, '..', 'data', 'AMOS22', path_['image']),
-              os.path.join(path_dir, '..', 'data', 'AMOS22', path_['label'])]
+file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
+              os.path.join(path_dir, 'AMOS22', path_['label'])]
              for path_ in task2_json['training']]
 
 CT_train_path = file_path[0:150]
@@ -31,9 +33,9 @@ CT_test_path = file_path[160:200]
 MRI_train_path = file_path[200:230]
 MRI_valid_path = file_path[230:232]
 MRI_test_path = file_path[232::]
-train_path = CT_train_path + MRI_train_path
-valid_path = CT_valid_path + MRI_valid_path
-test_path = CT_test_path + MRI_test_path
+train_path = CT_train_path # + MRI_train_path
+valid_path = CT_valid_path # + MRI_valid_path
+test_path = CT_test_path # + MRI_test_path
 
 
 class data_set(Dataset):
@@ -217,8 +219,8 @@ class UnetModel(nn.Module):
     def forward(self, x):
         x, downsampling_features = self.encoder(x)
         seg_x = self.decoder(x, downsampling_features)
-        seg_x = self.sigmoid(seg_x)
-        # print("Final output shape: ", x.shape)
+        # seg_x = self.sigmoid(seg_x)   ##bj
+        # # print("Final output shape: ", x.shape)
         return seg_x
 
 
@@ -399,20 +401,31 @@ def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4
 if __name__ == '__main__':
     print('beginning training')
     class_num = 16
-    learning_rate = 3e-5
+    learning_rate = 1e-4
     n_epochs = 300
-    batch_size = 1
+    batch_size = 2
+    # device = torch.device('cpu')
     device = torch.device('cpu')
     # strategy_name eg. loss function name
     strategy = 'strategy_name'
-    path_dir = os.path.dirname(__file__)
-    path = os.path.join(path_dir, '..', 'checkpoints', strategy)
+    # path_dir = os.path.dirname(__file__)
+    path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22' 
+    # path = os.path.join(path_dir, '..', 'checkpoints', strategy)
+    path = os.path.join(path_dir, 'checkpoints', strategy)
     model = UnetModel(1, 16, 6)
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss1 = ComboLoss_wbce_dice(loss_weight)
     loss2 = ComboLoss_wbce_ndice(loss_weight)
+    # crit = loss2
+
+    from Dice_CE_Loss import DiceLoss, SoftCrossEntropyLoss
+    loss3_dice = DiceLoss(mode='multiclass')  ##bj
+    loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0)  ##bj
+    w_dice = 1.0
+    w_ce = 1.0
     # choice loss function
-    crit = loss1
+    # crit = loss3_dice
+    crit = loss4_ce
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     train_loader = get_train_data(batch_size=batch_size)
     valid_loader = get_valid_data()
@@ -421,13 +434,13 @@ if __name__ == '__main__':
     valid_acc = []
     max_acc = 0.
 
-    for i, j in get_test_data():
-        j = one_hot(j, 16)
-        j = rearrange(j, 'b d w h c -> b c d w h')
-        k = model(i)
-        print(loss1(k, j.float()).item())
-        print(loss2(j.float(), k).item())
-        pass
+    # for i, j in get_test_data():
+    #     j = one_hot(j, 16)
+    #     j = rearrange(j, 'b d w h c -> b c d w h')
+    #     k = model(i)
+    #     print(loss1(k, j.float()).item())
+    #     print(loss2(j.float(), k).item())
+    #     pass
 
     for epoch in range(1, n_epochs + 1):
         t_loss = []
@@ -440,41 +453,52 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             # trans GT to onehot
             data = data.float().to(device)
-            GT = GT.to(device)
-            GT = one_hot(GT, 16)
-            GT = rearrange(GT, 'b d w h c -> b c d w h')
+            GT = GT.to(device) 
+            # GT = one_hot(GT, 16) 
+            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3)) 
+            # # GT = rearrange(GT, 'b d w h c -> b c d w h')
             # training param
             output = model(data)
-
-            loss = crit(output, GT.float())
+            loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
+            # loss = crit(output, GT.float())
             loss.backward()
             optimizer.step()
             t_loss.append(loss.item())
-            print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
+            # print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
+            print('{} / {}: train_loss = {}'.format(index + 1, len(train_loader), loss.item() ) )
         print()
         model.eval()
-        model.cpu()
-        for index, (data, GT, GT_centre) in enumerate(valid_loader):
-            # valid data
-            GT = one_hot(GT, 16)
-            target = rearrange(GT, 'b d w h c -> b c d w h')
-            # training param
-            output, _ = model(data.float())
-            loss = crit(output, target.float())
-            v_acc.append(
-                calculate_acc(output, target, class_num=16, fun=DICE,
-                              is_training=True))
-            v_loss.append(loss.item())
-            print('\r \t {} / {}:valid_loss = {}'.format(index + 1, len(valid_loader), loss.item()), end="")
+        # model.cpu()   ###bj  still use GPU 
+        with torch.no_grad():   ##bj
+            for index, (data, GT) in enumerate(valid_loader):  ##bj
+                # valid data
+                # GT = one_hot(GT, 16)
+                # target = torch.permute(GT, ( 0, 4, 1, 2, 3))
+                # # target = rearrange(GT, 'b d w h c -> b c d w h')
+                # training param
+                output = model(data.float().to(device))  ##bj
+                GT = GT.to(device) 
+                loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
+
+                output = output.log_softmax(dim=1).exp()  ##bj 
+                GT = one_hot(GT.to(torch.long), 16)
+                target = torch.permute(GT, ( 0, 4, 1, 2, 3))
+                v_acc.append(
+                    calculate_acc(output, target, class_num=16, fun=DICE,
+                                    is_training=True))
+                v_loss.append(loss.item())
+                print('    {} / {}: valid_loss = {}'.format(index + 1, len(valid_loader), loss.item()) )
         # 每次保存最新的模型
         torch.save(model.state_dict(), os.path.join(path, 'Unet-new.pth'))
         # 保存最好的模型
+        v_loss = np.mean(v_loss)  ##bj
+        v_acc = np.mean(v_acc )  ##bj
         if v_acc > max_acc:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-final.pth'))
             max_acc = v_acc
         train_loss.append(t_loss)
         valid_loss.append(v_loss)
         valid_acc.append(v_acc)
-        # 保存训练的loss
-        save_loss(train_loss, valid_loss, valid_acc, strategy)
-        pic_loss_acc(strategy)
+        # # 保存训练的loss
+        # save_loss(train_loss, valid_loss, valid_acc, strategy)
+        # pic_loss_acc(strategy)
