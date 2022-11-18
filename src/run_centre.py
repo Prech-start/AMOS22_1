@@ -17,6 +17,7 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from visdom import Visdom
 import time
+from src.utils.trans_to_pointcloud import cal_centre_point_3
 
 wind = Visdom()
 wind2 = Visdom()
@@ -27,10 +28,10 @@ wind.line([[0., 0.]],  # Y的第一个点的坐标
           )
 
 wind2.line([[0.]],  # Y的第一个点的坐标
-          [0.],  # X的第一个点的坐标
-          win='dice',  # 窗口的名称
-          opts=dict(title='dice', legend=['dice'])  # 图像的标例
-          )
+           [0.],  # X的第一个点的坐标
+           win='dice',  # 窗口的名称
+           opts=dict(title='dice', legend=['dice'])  # 图像的标例
+           )
 
 ######################################################
 #################### DATALOADER ######################
@@ -61,15 +62,19 @@ class data_set(Dataset):
     def __getitem__(self, item):
         path_ = self.paths
         x = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][0])).astype(np.int16)
-        y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
+        y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int16)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
-        x = self.norm(x)
         x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
         y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-        x = torch.from_numpy(x).type(torch.FloatTensor)
-        y = torch.from_numpy(y).type(torch.LongTensor)
-        return x.unsqueeze_(0), y
+        x = self.norm(x)
+        # x = self.Standardization(x)
+        # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        z = cal_centre_point_3(y.squeeze(), path_[item][1], r=10)
+        x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
+        y = torch.from_numpy(y).type(torch.FloatTensor)
+        z = torch.from_numpy(z).type(torch.FloatTensor)
+        return x, y, z
 
     def __len__(self):
         return len(self.paths)
@@ -227,6 +232,7 @@ class UnetModel(nn.Module):
         self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
         self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
         # self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
+        self.centre_head = ConvBlock(out_channels, out_channels)
         if final_activation == "sigmoid":
             self.sigmoid = nn.Sigmoid()
         else:
@@ -237,7 +243,9 @@ class UnetModel(nn.Module):
         seg_x = self.decoder(x, downsampling_features)
         # seg_x = self.sigmoid(seg_x)   ##bj
         # # print("Final output shape: ", x.shape)
-        return seg_x
+        centre = self.centre_head(seg_x)
+        centre = self.sigmoid(centre)
+        return seg_x, centre
 
 
 class ConvTranspose(nn.Module):
@@ -422,11 +430,11 @@ def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4
 if __name__ == '__main__':
     print('beginning training')
     class_num = 16
-    learning_rate = 1e-2
+    learning_rate = 1e-3
     n_epochs = 300
     batch_size = 1
-    # device = torch.device('cpu')
-    device = torch.device('cuda:0')
+    device = torch.device('cpu')
+    # device = torch.device('cuda:0')
     # strategy_name eg. loss function name
     strategy = 'combo'
     path_dir = os.path.dirname(__file__)
@@ -470,7 +478,7 @@ if __name__ == '__main__':
         v_acc = []
         model.train()
         model.to(device)
-        for index, (data, GT) in enumerate(train_loader):
+        for index, (data, GT, C_GT) in enumerate(train_loader):
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
@@ -480,7 +488,7 @@ if __name__ == '__main__':
             # GT = torch.permute(GT, ( 0, 4, 1, 2, 3)) 
             # # GT = rearrange(GT, 'b d w h c -> b c d w h')
             # training param
-            output = model(data)
+            output, C_output = model(data)
             # loss_ = loss1(output, GT)
             # print(loss_)
             loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
@@ -531,7 +539,7 @@ if __name__ == '__main__':
                   win='train&valid_loss',  # 窗口的名称
                   update='append')
         wind2.line([[v_acc]],  # Y的第一个点的坐标
-                  [epoch],  # X的第一个点的坐标
-                  win='dice',  # 窗口的名称
-                  update='append')  # 图像的标例
+                   [epoch],  # X的第一个点的坐标
+                   win='dice',  # 窗口的名称
+                   update='append')  # 图像的标例
         time.sleep(0.5)
