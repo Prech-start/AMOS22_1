@@ -117,7 +117,7 @@ def cal_centre_point_3(label_arr, label_file_path, r):
     label_arr_ = torch.nn.functional.one_hot(torch.LongTensor(label_arr), 16).permute(-1, 0, 1, 2)
     if not os.path.exists(save_path):
         centre_arr = np.zeros_like(label_arr_).astype(np.float32)
-        for i in np.unique(label_arr).tolist():
+        for i in np.unique(label_arr).astype(int).tolist():
             if i == 0:
                 continue
             class_xyz = np.array(np.where(label_arr_[i, ...] == 1))

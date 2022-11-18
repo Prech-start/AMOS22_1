@@ -21,11 +21,11 @@ from src.utils.trans_to_pointcloud import cal_centre_point_3
 
 wind = Visdom()
 wind2 = Visdom()
-wind.line([[0., 0.]],  # Y的第一个点的坐标
-          [0.],  # X的第一个点的坐标
-          win='train&valid_loss',  # 窗口的名称
-          opts=dict(title='train_loss', legend=['train_loss', 'valid_loss'])  # 图像的标例
-          )
+# wind.line([[_, _]],  # Y的第一个点的坐标
+#           [],  # X的第一个点的坐标
+#           win='train&valid_loss',  # 窗口的名称
+#           opts=dict(title='train_loss', legend=['train_loss', 'valid_loss'])  # 图像的标例
+#           )
 
 wind2.line([[0.]],  # Y的第一个点的坐标
            [0.],  # X的第一个点的坐标
@@ -37,7 +37,8 @@ wind2.line([[0.]],  # Y的第一个点的坐标
 #################### DATALOADER ######################
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
-path_dir = r'/home/ljc/code/AMOS22/data/'
+path_dir = r'../data/'
+# path_dir = r'/home/ljc/code/AMOS22/data/'
 task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'task2_dataset.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
@@ -451,12 +452,14 @@ if __name__ == '__main__':
 
     loss3_dice = DiceLoss(mode='multiclass')  ##bj
     loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0)  ##bj
+    loss5_L1 = nn.SmoothL1Loss()
     w_dice = 1.0
     w_ce = 1.0
+    w_L1 = 0.3
     # choice loss function
     # crit = loss3_dice
     crit = loss4_ce
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     train_loader = get_train_data(batch_size=batch_size)
     valid_loader = get_valid_data()
     train_loss = []
@@ -491,7 +494,7 @@ if __name__ == '__main__':
             output, C_output = model(data)
             # loss_ = loss1(output, GT)
             # print(loss_)
-            loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
+            loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT) + w_L1 * loss5_L1(C_output, C_GT)
             # loss = crit(output, GT.float())
             loss.backward()
             optimizer.step()
