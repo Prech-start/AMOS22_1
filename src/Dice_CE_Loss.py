@@ -170,6 +170,8 @@ class DiceLoss(_Loss):
             loss = -torch.log(scores.clamp_min(self.eps))
         else:
             loss = 1.0 - scores
+
+
         # print(loss.mean())
         # Dice loss is undefined for non-empty classes
         # So we zero contribution of channel that does not have true pixels
@@ -224,6 +226,7 @@ def label_smoothed_nll_loss(
         nll_loss = nll_loss.mean()
         smooth_loss = smooth_loss.mean()
     if reduction == "weighted":
+
         pass
 
     eps_i = epsilon / lprobs.size(dim)

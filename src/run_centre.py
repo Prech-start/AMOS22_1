@@ -434,8 +434,8 @@ if __name__ == '__main__':
     learning_rate = 1e-3
     n_epochs = 300
     batch_size = 1
-    device = torch.device('cpu')
-    # device = torch.device('cuda:0')
+    # device = torch.device('cpu')
+    device = torch.device('cuda:0')
     # strategy_name eg. loss function name
     strategy = 'combo'
     path_dir = os.path.dirname(__file__)
