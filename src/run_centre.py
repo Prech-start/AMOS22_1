@@ -434,8 +434,8 @@ if __name__ == '__main__':
     learning_rate = 1e-3
     n_epochs = 300
     batch_size = 1
-    # device = torch.device('cpu')
-    device = torch.device('cuda:0')
+    device = torch.device('cpu')
+    # device = torch.device('cuda:0')
     # strategy_name eg. loss function name
     strategy = 'combo'
     path_dir = os.path.dirname(__file__)
@@ -450,8 +450,8 @@ if __name__ == '__main__':
 
     from Dice_CE_Loss import DiceLoss, SoftCrossEntropyLoss
 
-    loss3_dice = DiceLoss(mode='multiclass')  ##bj
-    loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0)  ##bj
+    loss3_dice = DiceLoss(mode='multiclass', weight=loss_weight)  ##bj
+    loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0, weight=loss_weight)  ##bj
     loss5_L1 = nn.SmoothL1Loss()
     w_dice = 1.0
     w_ce = 1.0
