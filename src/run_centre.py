@@ -21,7 +21,7 @@ from src.utils.trans_to_pointcloud import cal_centre_point_3
 
 wind = Visdom()
 wind2 = Visdom()
-# wind.line([[_, _]],  # Y的第一个点的坐标
+# wind_loss.line([[_, _]],  # Y的第一个点的坐标
 #           [],  # X的第一个点的坐标
 #           win='train&valid_loss',  # 窗口的名称
 #           opts=dict(title='train_loss', legend=['train_loss', 'valid_loss'])  # 图像的标例
@@ -479,6 +479,8 @@ if __name__ == '__main__':
         t_loss = []
         v_loss = []
         v_acc = []
+        dice_loss = []
+        ce_loss = []
         model.train()
         model.to(device)
         for index, (data, GT, C_GT) in enumerate(train_loader):
@@ -494,6 +496,7 @@ if __name__ == '__main__':
             output, C_output = model(data)
             # loss_ = loss1(output, GT)
             # print(loss_)
+            dcL = loss3_dice(output, GT)
             loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT) + w_L1 * loss5_L1(C_output, C_GT)
             # loss = crit(output, GT.float())
             loss.backward()
@@ -540,7 +543,10 @@ if __name__ == '__main__':
         wind.line([[t_loss, v_loss, v_acc]],  # Y的第一个点的坐标
                   [epoch],  # X的第一个点的坐标
                   win='train&valid_loss',  # 窗口的名称
-                  update='append')
+                  update='append',
+                  opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'valid_loss']
+                            ),
+                  )
         wind2.line([[v_acc]],  # Y的第一个点的坐标
                    [epoch],  # X的第一个点的坐标
                    win='dice',  # 窗口的名称

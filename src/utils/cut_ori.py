@@ -7,6 +7,11 @@ import numpy as np
 
 
 def cut_(ori_path, gt_path, save_path, spacing=None):
+    '''
+    para:
+        ori_path, gt_path : root path of ori_image and gt_image
+        save_path : root path of cropped image's folder
+    '''
     start_time = time.time()
     ori_image = np.array(sitk.GetArrayFromImage(sitk.ReadImage(ori_path)))
     gt_image = np.array(sitk.GetArrayFromImage(sitk.ReadImage(gt_path)))
@@ -35,7 +40,7 @@ def cut_(ori_path, gt_path, save_path, spacing=None):
     save_nii.np2nii(cut_gt_image, spacing=information[0], outDir=os.path.join(save_path, 'tr_gt', gt_file_name))
     pickle.dump(information,
                 open(os.path.join(save_path, 'inf', '{}.inf'.format(gt_file_name.split('.')[0])), 'wb+'))
-    print('processed: from xx shape to xx shape, costed {} s.'.format(time.time() - start_time))
+    print('processed: from xx shape to xx shape, cost {} s.'.format(time.time() - start_time))
 
 
 def norm(x):
@@ -52,10 +57,13 @@ def norm(x):
 if __name__ == '__main__':
     # ori_path, gt_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr/amos_0001.nii.gz', '/home/ljc/code/AMOS22/data/AMOS22/labelsTr/amos_0001.nii.gz'
     # cut_(ori_path, gt_path, '/home/ljc/code/AMOS22/data/AMOS22/')
-    ori_paths = os.listdir('/home/ljc/code/AMOS22/data/AMOS22/imagesTr/')
-    gt_paths = os.listdir('/home/ljc/code/AMOS22/data/AMOS22/labelsTr/')
+    ori_root_path = '/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/imagesTr/'
+    gt_root_path = '/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/labelsTr/'
+    save_path = '/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/'
+    ori_paths = os.listdir(ori_root_path)
+    gt_paths = os.listdir(gt_root_path)
     ori_paths.sort()
     gt_paths.sort()
     for ori_path, gt_path in zip(ori_paths, gt_paths):
-        cut_(os.path.join('/home/ljc/code/AMOS22/data/AMOS22/imagesTr/', ori_path),
-             os.path.join('/home/ljc/code/AMOS22/data/AMOS22/labelsTr/', gt_path), '/home/ljc/code/AMOS22/data/AMOS22/')
+        cut_(os.path.join(ori_root_path, ori_path),
+             os.path.join(gt_root_path, gt_path), save_path)

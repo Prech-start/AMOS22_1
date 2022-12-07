@@ -18,42 +18,88 @@ import matplotlib.pyplot as plt
 from visdom import Visdom
 import time
 
-wind = Visdom()
-wind2 = Visdom()
-wind.line([[0., 0.]],  # Y的第一个点的坐标
-          [0.],  # X的第一个点的坐标
-          win='train&valid_loss',  # 窗口的名称
-          opts=dict(title='train_loss', legend=['train_loss', 'valid_loss'])  # 图像的标例
-          )
+wind_loss = Visdom()
+wind_dice = Visdom()
+# wind_loss.line([[0., 0.]],  # Y的第一个点的坐标
+#                [0.],  # X的第一个点的坐标
+#                win='train&valid_loss',  # 窗口的名称
+#                opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'valid_loss'])  # 图像的标例
+#                )
 
-wind2.line([[0.]],  # Y的第一个点的坐标
-           [0.],  # X的第一个点的坐标
-           win='dice',  # 窗口的名称
-           opts=dict(title='dice', legend=['dice'])  # 图像的标例
-           )
-
+wind_dice.line([[0.]],  # Y的第一个点的坐标
+               [0.],  # X的第一个点的坐标
+               win='dice',  # 窗口的名称
+               opts=dict(title='dice', legend=['dice'])  # 图像的标例
+               )
 ######################################################
 #################### DATALOADER ######################
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
-path_dir = r'/home/ljc/code/AMOS22/data/'
-task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'task2_dataset.json')))
+path_dir = r'/media/ljc/ugreen/dataset/Abdomen/Abdomen/RawData'
+task2_json = json.load(open(os.path.join(path_dir, 'dataset.json')))
 
-file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
-              os.path.join(path_dir, 'AMOS22', path_['label'])]
+file_path = [[os.path.join(path_dir, path_['image']),
+              os.path.join(path_dir, path_['label'])]
              for path_ in task2_json['training']]
+lens = len(file_path)
 
-CT_train_path = file_path[0:150]
-CT_valid_path = file_path[150:160]
-CT_test_path = file_path[160:200]
-MRI_train_path = file_path[200:230]
-MRI_valid_path = file_path[230:232]
-MRI_test_path = file_path[232::]
+CT_train_path = file_path[0:lens // 2]
+CT_valid_path = file_path[lens // 2: 3 * lens // 4]
+CT_test_path = file_path[3 * lens // 4::]
+# CT_test_path = file_path
+
+# MRI_train_path = file_path[200:230]
+# MRI_valid_path = file_path[230:232]
+# MRI_test_path = file_path[232::]
 train_path = CT_train_path  # + MRI_train_path
 valid_path = CT_valid_path  # + MRI_valid_path
 test_path = CT_test_path  # + MRI_test_path
 
-compare_path = file_path[150 - 10:150]
+'''
+AMOS22
+    "labels": {
+        "0": "background",
+        "1": "spleen",
+        "2": "right kidney",
+        "3": "left kidney",
+        "4": "gall bladder",
+        "5": "esophagus",
+        "6": "liver",
+        "7": "stomach",
+        "8": "aorta",
+        "9": "postcava",
+        "10": "pancreas",
+        "11": "right adrenal gland",
+        "12": "left adrenal gland",
+        "13": "duodenum",
+        "14": "bladder",
+        "15": "prostate/uterus"
+    }
+BTCV
+    'labels':{
+        "0": "background",
+        "1": "spleen",
+        "2": "right kidney",
+        "3": "left kidney",
+        "4": "gall bladder",
+        "5": "esophagus",
+        "6": "liver",
+        "7": "stomach",
+        "8": "arota",
+        "9": "inferior vena cava", !!!!
+        "10": "portal vein and splenic vein",!!!!
+        "11": "pancreas",
+        "12": "right adrenal gland",
+        "13": "left adrenal gland",
+    }
+9 = 0
+10 = 0
+11 = 10
+12 =11
+13 = 12
+
+'''
+
 
 class data_set(Dataset):
     def __init__(self, file_path):
@@ -65,6 +111,11 @@ class data_set(Dataset):
         y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
+        y[y == 9] = 0
+        y[y == 10] = 0
+        y[y == 11] = 10
+        y[y == 12] = 11
+        y[y == 13] = 12
         x = self.norm(x)
         x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
         y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
@@ -118,14 +169,6 @@ def get_test_data():
         dataset=data,
         batch_size=1,
         shuffle=False
-    )
-
-def get_compare_data():
-    data = data_set(compare_path)
-    return DataLoader(
-        dataset=data,
-        batch_size=1,
-        shuffle=False,
     )
 
 
@@ -431,16 +474,19 @@ def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4
 if __name__ == '__main__':
     print('beginning training')
     class_num = 16
-    learning_rate = 1e-3
+    learning_rate = 1e-2
     n_epochs = 300
     batch_size = 1
+    is_load = False
     # device = torch.device('cpu')
     device = torch.device('cuda:0')
-    # strategy_name eg. loss function name
-    strategy = 'newcombo'
+    strategy = 'BTCV'
+    load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
     path = os.path.join(path_dir, 'checkpoints', strategy)
+    if os.path.exists(path):
+        os.makedirs(path)
     # path = os.path.join(path_dir, 'checkpoints', strategy)
     model = UnetModel(1, 16, 6)
     loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
@@ -464,11 +510,15 @@ if __name__ == '__main__':
     valid_loss = []
     valid_acc = []
     max_acc = 0.
+    if is_load:
+        model.load_state_dict(torch.load(load_path))
 
     for epoch in range(1, n_epochs + 1):
         t_loss = []
         v_loss = []
         v_acc = []
+        dice_loss = []
+        ce_loss = []
         model.train()
         model.to(device)
         for index, (data, GT) in enumerate(train_loader):
@@ -484,11 +534,15 @@ if __name__ == '__main__':
             output = model(data)
             # loss_ = loss1(output, GT)
             # print(loss_)
-            loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
+            dc = loss3_dice(output, GT)
+            ce = loss4_ce(output, GT)
+            loss = w_dice * dc + w_ce * ce
             # loss = crit(output, GT.float())
             loss.backward()
             optimizer.step()
             t_loss.append(loss.item())
+            dice_loss.append(dc.item())
+            ce_loss.append(ce.item())
             # print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
             print('{} / {}: train_loss = {}'.format(index + 1, len(train_loader), loss.item()))
         print()
@@ -519,20 +573,25 @@ if __name__ == '__main__':
         t_loss = np.mean(t_loss)
         v_loss = np.mean(v_loss)  ##bj
         v_acc = np.mean(v_acc)  ##bj
+        dice_loss = np.mean(dice_loss)
+        ce_loss = np.mean(ce_loss)
         print('valid_acc = {}'.format(v_acc))
         if v_acc > max_acc:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-final.pth'))
             max_acc = v_acc
-        train_loss.append(t_loss)
-        valid_loss.append(v_loss)
-        valid_acc.append(v_acc)
+        # train_loss.append(t_loss)
+        # valid_loss.append(v_loss)
+        # valid_acc.append(v_acc)
         # # 保存训练的loss
-        wind.line([[t_loss, v_loss, v_acc]],  # Y的第一个点的坐标
-                  [epoch],  # X的第一个点的坐标
-                  win='train&valid_loss',  # 窗口的名称
-                  update='append')
-        wind2.line([[v_acc]],  # Y的第一个点的坐标
-                   [epoch],  # X的第一个点的坐标
-                   win='dice',  # 窗口的名称
-                   update='append')  # 图像的标例
+        wind_loss.line([[dice_loss, ce_loss, t_loss, v_loss]],  # Y的第一个点的坐标
+                       [epoch],  # X的第一个点的坐标
+                       win='train&valid_loss',  # 窗口的名称
+                       update='append',
+                       opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss'])
+                       )
+
+        wind_dice.line([[v_acc]],  # Y的第一个点的坐标
+                       [epoch],  # X的第一个点的坐标
+                       win='dice',  # 窗口的名称
+                       update='append')  # 图像的标例
         time.sleep(0.5)
