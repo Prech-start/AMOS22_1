@@ -92,7 +92,7 @@ def cal_dice_loss(model_path: str, dataloader):
 
 if __name__ == '__main__':
     print('begin')
-    model_path = '/home/ljc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
+    model_path = '/home/ljc/code/AMOS22/src/checkpoints/cropped_data/Unet-final.pth'
     compare_evals = cal_dice_loss(model_path=model_path, dataloader=get_compare_data())
     valid_evals = cal_dice_loss(model_path=model_path, dataloader=get_test_data())
     compare_array = np.concatenate([compare_evals, valid_evals], axis=1)

@@ -5,12 +5,14 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 if __name__ == '__main__':
-    path = '/media/ljc/ugreen/dataset/Abdomen/RawData/Training/img/img0002.nii.gz'
+    # path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr/amos_0001.nii.gz' # AMOS
+    # path = '/media/ljc/ugreen/dataset/Abdomen/RawData/Training/img/img0004.nii.gz' # BTCV
+    path = '/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/imagesTr/word_0003.nii.gz' # WORD
     x = sitk.GetArrayFromImage(sitk.ReadImage(path)).astype(np.int16)
     x = x.flatten()
-    x = np.clip(x, 0, 99999)
+    x = np.clip(x, -175, 1500)
     x.sort()
-    array = np.where(x > 0)
+    array = np.where(x > -175)
     x = x[array[0][0]:-1]
     # x = x.reshape(-1, 1)
     plt.hist(x, bins=100)

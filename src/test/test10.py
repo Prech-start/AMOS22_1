@@ -58,7 +58,7 @@ def generate_dataset_json(output_file: str, imagesTr_dir: str, imagesTs_dir: str
         test_identifiers = []
 
     json_dict = {}
-    json_dict['name'] = "BTCV"
+    json_dict['name'] = "AMOS22"
     json_dict['description'] = "open data set"
     json_dict['tensorImageSize'] = "3D"
     json_dict['reference'] = dataset_reference
@@ -74,25 +74,27 @@ def generate_dataset_json(output_file: str, imagesTr_dir: str, imagesTs_dir: str
         "5": "esophagus",
         "6": "liver",
         "7": "stomach",
-        "8": "arota",
-        "9": "inferior vena cava",
-        "10": "portal vein and splenic vein",
-        "11": "pancreas",
-        "12": "right adrenal gland",
-        "13": "left adrenal gland",
+        "8": "aorta",
+        "9": "postcava",
+        "10": "pancreas",
+        "11": "right adrenal gland",
+        "12": "left adrenal gland",
+        "13": "duodenum",
+        "14": "bladder",
+        "15": "prostate/uterus"
     }
 
     # 下面这些内容不需要查看和更改
     json_dict['numTraining'] = len(train_identifiers)
     json_dict['numTest'] = len(test_identifiers)
     json_dict['training'] = [
-        {'image': "./Training/img/%s.nii.gz" % i, "label": "./Training/label/%s.nii.gz" % j} for i, j
+        {'image': "./tr_ori/%s.nii.gz" % i, "label": "./tr_gt/%s.nii.gz" % j} for i, j
         in
         zip(train_identifiers, label_identifiers)]
-    json_dict['test'] = ["./Testing/img/%s.nii.gz" % i for i in test_identifiers]
+    json_dict['test'] = ["./imagesTs/%s.nii.gz" % i for i in test_identifiers]
 
-    output_file += "dataset.json"
-    if not output_file.endswith("dataset_croped.json"):
+    output_file += "dataset_cropped.json"
+    if not output_file.endswith("dataset.json"):
         print("WARNING: output file name is not dataset.json! This may be intentional or not. You decide. "
               "Proceeding anyways...")
     save_json(json_dict, os.path.join(output_file))
@@ -102,10 +104,10 @@ if __name__ == "__main__":
     # for _, p in test_path:
     #     move(p, '/home/ljc/nnUNetFrame/DATASET/nnUNet_raw/nnUNet_raw_data/Task51_AMOS/imagesTl/')
     # 自行修改文件路径，当前在windows环境下操作
-    output_file = r'/media/ljc/ugreen/dataset/Abdomen/Abdomen/RawData/'
-    imagesTr_dir = r'/media/ljc/ugreen/dataset/Abdomen/Abdomen/RawData/Training/tr_ori'
-    imagesTs_dir = r'/media/ljc/ugreen/dataset/Abdomen/Abdomen/RawData/Testing/img'
-    labelsTr = r'/media/ljc/ugreen/dataset/Abdomen/Abdomen/RawData/Training/tr_gt'
+    output_file = r'/home/ljc/code/AMOS22/data/AMOS22/'
+    imagesTr_dir = r'/home/ljc/code/AMOS22/data/AMOS22/tr_ori/'
+    imagesTs_dir = r'/home/ljc/code/AMOS22/data/AMOS22/imagesTs'
+    labelsTr = r'/home/ljc/code/AMOS22/data/AMOS22/tr_gt/'
 
     # 只需要给出空定义，具体内容在上面的函数中修改
     modalities = ''
@@ -117,3 +119,4 @@ if __name__ == "__main__":
                           imagesTs_dir,
                           labelsTr,
                           )
+    pass

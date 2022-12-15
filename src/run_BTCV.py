@@ -485,7 +485,7 @@ if __name__ == '__main__':
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
     path = os.path.join(path_dir, 'checkpoints', strategy)
-    if os.path.exists(path):
+    if not os.path.exists(path):
         os.makedirs(path)
     # path = os.path.join(path_dir, 'checkpoints', strategy)
     model = UnetModel(1, 16, 6)
@@ -521,6 +521,9 @@ if __name__ == '__main__':
         ce_loss = []
         model.train()
         model.to(device)
+        if epoch == 100:
+            learning_rate = 1e-4
+            optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT) in enumerate(train_loader):
             # train_data
             optimizer.zero_grad()
@@ -579,6 +582,8 @@ if __name__ == '__main__':
         if v_acc > max_acc:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-final.pth'))
             max_acc = v_acc
+        if epoch % 10 ==0:
+            torch.save(model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch +1)))
         # train_loss.append(t_loss)
         # valid_loss.append(v_loss)
         # valid_acc.append(v_acc)

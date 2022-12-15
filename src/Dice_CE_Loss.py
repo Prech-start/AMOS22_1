@@ -83,7 +83,7 @@ class DiceLoss(_Loss):
             smooth: float = 0.0,
             ignore_index=None,
             eps=1e-7,
-            weight: [] = None,
+            weight: List = None,
     ):
         """
         :param mode: Metric mode {'binary', 'multiclass', 'multilabel'}
@@ -111,6 +111,7 @@ class DiceLoss(_Loss):
         self.log_loss = log_loss
         if weight is not None:
             self.weight = torch.Tensor(weight) / np.sum(weight)
+
         else:
             self.weight = None
 
@@ -121,6 +122,8 @@ class DiceLoss(_Loss):
         :return: scalar
         """
         assert y_true.size(0) == y_pred.size(0)
+        if self.weight is not None:
+            self.weight = self.weight.to(y_pred.device)
         # batch_size = y_true.size(0)
         # input = y_pred.contiguous().view(batch_size, 16, -1)
         # target_ = y_true.contiguous().view(batch_size, 16, -1)
@@ -208,6 +211,8 @@ def label_smoothed_nll_loss(
     :param reduction:
     :return:
     """
+    if weight is not None:
+        weight = weight.to(lprobs.device)
     if target.dim() == lprobs.dim() - 1:
         target = target.unsqueeze(dim)
     target = target.to(torch.long)
@@ -258,7 +263,7 @@ class SoftCrossEntropyLoss(nn.Module):
     __constants__ = ["reduction", "ignore_index", "smooth_factor"]
 
     def __init__(self, reduction: str = "mean", smooth_factor: float = 0.0, ignore_index: Optional[int] = -100, dim=1,
-                 weight: [] = None):
+                 weight: List = None):
         super().__init__()
         self.smooth_factor = smooth_factor
         self.ignore_index = ignore_index
@@ -268,7 +273,8 @@ class SoftCrossEntropyLoss(nn.Module):
 
     def forward(self, input: Tensor, target: Tensor) -> Tensor:
         log_prob = F.log_softmax(input, dim=self.dim)
-        self.weight = torch.Tensor(self.weight)
+        if self.weight != None:
+            self.weight = torch.Tensor(self.weight)
         return label_smoothed_nll_loss(
             log_prob,
             target,

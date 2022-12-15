@@ -608,6 +608,8 @@ if __name__ == '__main__':
         if v_acc > max_acc:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-final.pth'))
             max_acc = v_acc
+        if epoch % 10 == 0:
+            torch.save(model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch + 1)))
         train_loss.append(t_loss)
         valid_loss.append(v_loss)
         valid_acc.append(v_acc)

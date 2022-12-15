@@ -18,26 +18,12 @@ import matplotlib.pyplot as plt
 from visdom import Visdom
 import time
 
-wind = Visdom()
-wind2 = Visdom()
-wind.line([[0., 0.]],  # Y的第一个点的坐标
-          [0.],  # X的第一个点的坐标
-          win='train&valid_loss',  # 窗口的名称
-          opts=dict(title='train_loss', legend=['train_loss', 'valid_loss'])  # 图像的标例
-          )
-
-wind2.line([[0.]],  # Y的第一个点的坐标
-           [0.],  # X的第一个点的坐标
-           win='dice',  # 窗口的名称
-           opts=dict(title='dice', legend=['dice'])  # 图像的标例
-           )
-
 ######################################################
 #################### DATALOADER ######################
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
 path_dir = r'/home/ljc/code/AMOS22/data/'
-task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'task2_dataset.json')))
+task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
               os.path.join(path_dir, 'AMOS22', path_['label'])]
@@ -54,6 +40,7 @@ valid_path = CT_valid_path  # + MRI_valid_path
 test_path = CT_test_path  # + MRI_test_path
 
 compare_path = file_path[150 - 10:150]
+
 
 class data_set(Dataset):
     def __init__(self, file_path):
@@ -119,6 +106,7 @@ def get_test_data():
         batch_size=1,
         shuffle=False
     )
+
 
 def get_compare_data():
     data = data_set(compare_path)
@@ -430,28 +418,45 @@ def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4
 
 if __name__ == '__main__':
     print('beginning training')
+    wind_loss = Visdom()
+    wind_dice = Visdom()
+    # wind_loss.line([[0., 0.]],  # Y的第一个点的坐标
+    #                [0.],  # X的第一个点的坐标
+    #                win='train&valid_loss',  # 窗口的名称
+    #                opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'valid_loss'])  # 图像的标例
+    #                )
+
+    wind_dice.line([[0.]],  # Y的第一个点的坐标
+                   [0.],  # X的第一个点的坐标
+                   win='dice',  # 窗口的名称
+                   opts=dict(title='dice', legend=['dice'])  # 图像的标例
+                   )
     class_num = 16
     learning_rate = 1e-3
     n_epochs = 300
     batch_size = 1
+    is_load = False
     # device = torch.device('cpu')
     device = torch.device('cuda:0')
-    # strategy_name eg. loss function name
-    strategy = 'newcombo'
+    strategy = 'cropped_data_weight2'
+    load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
     path = os.path.join(path_dir, 'checkpoints', strategy)
+    if not os.path.exists(path):
+        os.makedirs(path)
     # path = os.path.join(path_dir, 'checkpoints', strategy)
     model = UnetModel(1, 16, 6)
-    loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
+    # loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
+    loss_weight = [1, 1.02, 1.03, 1.03, 0.88, 0.87, 1.04, 0.91, 1.03, 1.01, 0.90, 0.91, 0.83, 0.85, 0.86, 0.86]
     loss1 = ComboLoss_wbce_dice(loss_weight)
     loss2 = ComboLoss_wbce_ndice(loss_weight)
     # crit = loss2
 
     from Dice_CE_Loss import DiceLoss, SoftCrossEntropyLoss
 
-    loss3_dice = DiceLoss(mode='multiclass')  ##bj
-    loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0)  ##bj
+    loss3_dice = DiceLoss(mode='multiclass', weight=loss_weight)  ##bj
+    loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0, weight=loss_weight)  ##bj
     w_dice = 1.0
     w_ce = 1.0
     # choice loss function
@@ -464,36 +469,47 @@ if __name__ == '__main__':
     valid_loss = []
     valid_acc = []
     max_acc = 0.
+    if is_load:
+        model.load_state_dict(torch.load(load_path))
 
     for epoch in range(1, n_epochs + 1):
         t_loss = []
         v_loss = []
         v_acc = []
+        dice_loss = []
+        ce_loss = []
         model.train()
         model.to(device)
+        if epoch == 150:
+            learning_rate = 1e-4
+            optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT) in enumerate(train_loader):
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
             data = data.float().to(device)
             GT = GT.to(device)
-            # GT = one_hot(GT, 16) 
-            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3)) 
+            # GT = one_hot(GT, 16)
+            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3))
             # # GT = rearrange(GT, 'b d w h c -> b c d w h')
             # training param
             output = model(data)
             # loss_ = loss1(output, GT)
             # print(loss_)
-            loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
+            dc = loss3_dice(output, GT)
+            ce = loss4_ce(output, GT)
+            loss = w_dice * dc + w_ce * ce
             # loss = crit(output, GT.float())
             loss.backward()
             optimizer.step()
             t_loss.append(loss.item())
+            dice_loss.append(dc.item())
+            ce_loss.append(ce.item())
             # print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
             print('{} / {}: train_loss = {}'.format(index + 1, len(train_loader), loss.item()))
         print()
         model.eval()
-        # model.cpu()   ###bj  still use GPU 
+        # model.cpu()   ###bj  still use GPU
         with torch.no_grad():  ##bj
             for index, (data, GT) in enumerate(valid_loader):  ##bj
                 # valid data
@@ -505,7 +521,7 @@ if __name__ == '__main__':
                 GT = GT.to(device)
                 loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
 
-                output = output.log_softmax(dim=1).exp()  ##bj 
+                output = output.log_softmax(dim=1).exp()  ##bj
                 GT = one_hot(GT.to(torch.long), 16)
                 target = torch.permute(GT, (0, 4, 1, 2, 3))
                 v_acc.append(
@@ -519,20 +535,27 @@ if __name__ == '__main__':
         t_loss = np.mean(t_loss)
         v_loss = np.mean(v_loss)  ##bj
         v_acc = np.mean(v_acc)  ##bj
+        dice_loss = np.mean(dice_loss)
+        ce_loss = np.mean(ce_loss)
         print('valid_acc = {}'.format(v_acc))
         if v_acc > max_acc:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-final.pth'))
             max_acc = v_acc
-        train_loss.append(t_loss)
-        valid_loss.append(v_loss)
-        valid_acc.append(v_acc)
+        if epoch % 10 == 0:
+            torch.save(model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch + 1)))
+        # train_loss.append(t_loss)
+        # valid_loss.append(v_loss)
+        # valid_acc.append(v_acc)
         # # 保存训练的loss
-        wind.line([[t_loss, v_loss, v_acc]],  # Y的第一个点的坐标
-                  [epoch],  # X的第一个点的坐标
-                  win='train&valid_loss',  # 窗口的名称
-                  update='append')
-        wind2.line([[v_acc]],  # Y的第一个点的坐标
-                   [epoch],  # X的第一个点的坐标
-                   win='dice',  # 窗口的名称
-                   update='append')  # 图像的标例
+        wind_loss.line([[dice_loss, ce_loss, t_loss, v_loss]],  # Y的第一个点的坐标
+                       [epoch],  # X的第一个点的坐标
+                       win='train&valid_loss',  # 窗口的名称
+                       update='append',
+                       opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss'])
+                       )
+
+        wind_dice.line([[v_acc]],  # Y的第一个点的坐标
+                       [epoch],  # X的第一个点的坐标
+                       win='dice',  # 窗口的名称
+                       update='append')  # 图像的标例
         time.sleep(0.5)
