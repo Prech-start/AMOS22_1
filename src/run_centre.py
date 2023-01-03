@@ -17,13 +17,15 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from visdom import Visdom
 import time
+from src.utils.trans_to_pointcloud import cal_centre_point_3
 
 ######################################################
 #################### DATALOADER ######################
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
-path_dir = r'/home/ljc/code/AMOS22/data/'
-task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
+path_dir = r'../data/'
+# path_dir = r'/home/ljc/code/AMOS22/data/'
+task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'task2_dataset.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
               os.path.join(path_dir, 'AMOS22', path_['label'])]
@@ -39,8 +41,6 @@ train_path = CT_train_path  # + MRI_train_path
 valid_path = CT_valid_path  # + MRI_valid_path
 test_path = CT_test_path  # + MRI_test_path
 
-compare_path = file_path[150 - 10:150]
-
 
 class data_set(Dataset):
     def __init__(self, file_path):
@@ -49,15 +49,19 @@ class data_set(Dataset):
     def __getitem__(self, item):
         path_ = self.paths
         x = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][0])).astype(np.int16)
-        y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
+        y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int16)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
-        x = self.norm(x)
         x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
         y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-        x = torch.from_numpy(x).type(torch.FloatTensor)
-        y = torch.from_numpy(y).type(torch.LongTensor)
-        return x.unsqueeze_(0), y
+        x = self.norm(x)
+        # x = self.Standardization(x)
+        # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        z = cal_centre_point_4(y.squeeze(), path_[item][1], r=10)
+        x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
+        y = torch.from_numpy(y).type(torch.FloatTensor)
+        z = torch.from_numpy(z).type(torch.FloatTensor)
+        return x, y, z
 
     def __len__(self):
         return len(self.paths)
@@ -105,15 +109,6 @@ def get_test_data():
         dataset=data,
         batch_size=1,
         shuffle=False
-    )
-
-
-def get_compare_data():
-    data = data_set(compare_path)
-    return DataLoader(
-        dataset=data,
-        batch_size=1,
-        shuffle=False,
     )
 
 
@@ -224,6 +219,7 @@ class UnetModel(nn.Module):
         self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
         self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
         # self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
+        self.centre_head = ConvBlock(out_channels, out_channels)
         if final_activation == "sigmoid":
             self.sigmoid = nn.Sigmoid()
         else:
@@ -234,7 +230,9 @@ class UnetModel(nn.Module):
         seg_x = self.decoder(x, downsampling_features)
         # seg_x = self.sigmoid(seg_x)   ##bj
         # # print("Final output shape: ", x.shape)
-        return seg_x
+        centre = self.centre_head(seg_x)
+        centre = self.sigmoid(centre)
+        return seg_x, centre
 
 
 class ConvTranspose(nn.Module):
@@ -437,8 +435,8 @@ if __name__ == '__main__':
     batch_size = 1
     is_load = False
     # device = torch.device('cpu')
-    device = torch.device('cuda:0')
-    strategy = 'cropped_data_weight2'
+    device = torch.device('cuda:1')
+    strategy = 'cropped_data'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
@@ -447,7 +445,6 @@ if __name__ == '__main__':
         os.makedirs(path)
     # path = os.path.join(path_dir, 'checkpoints', strategy)
     model = UnetModel(1, 16, 6)
-    # loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss_weight = [1, 1.02, 1.03, 1.03, 0.88, 0.87, 1.04, 0.91, 1.03, 1.01, 0.90, 0.91, 0.83, 0.85, 0.86, 0.86]
     loss1 = ComboLoss_wbce_dice(loss_weight)
     loss2 = ComboLoss_wbce_ndice(loss_weight)
@@ -457,8 +454,10 @@ if __name__ == '__main__':
 
     loss3_dice = DiceLoss(mode='multiclass', weight=loss_weight)  ##bj
     loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0, weight=loss_weight)  ##bj
+    loss5_L1 = torch.nn.SmoothL1Loss()
     w_dice = 1.0
     w_ce = 1.0
+    w_L1 = 0.1
     # choice loss function
     # crit = loss3_dice
     crit = loss4_ce
@@ -473,43 +472,48 @@ if __name__ == '__main__':
         model.load_state_dict(torch.load(load_path))
 
     for epoch in range(1, n_epochs + 1):
+        w_L1 = weight = ((epoch - n_epochs) ** 2) / ((1 - n_epochs) ** 2)
         t_loss = []
         v_loss = []
         v_acc = []
         dice_loss = []
         ce_loss = []
+        l1_loss = []
         model.train()
         model.to(device)
         if epoch == 150:
             learning_rate = 1e-4
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        for index, (data, GT) in enumerate(train_loader):
+        for index, (data, GT, C_GT) in enumerate(train_loader):
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
             data = data.float().to(device)
             GT = GT.to(device)
-            # GT = one_hot(GT, 16)
-            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3))
+            # GT = one_hot(GT, 16) 
+            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3)) 
             # # GT = rearrange(GT, 'b d w h c -> b c d w h')
             # training param
-            output = model(data)
+            output, C_output = model(data)
             # loss_ = loss1(output, GT)
             # print(loss_)
+            # dcL = loss3_dice(output, GT)
             dc = loss3_dice(output, GT)
             ce = loss4_ce(output, GT)
-            loss = w_dice * dc + w_ce * ce
+            l1 = loss5_L1(C_output, C_GT)
+            loss = w_dice * dc + w_ce * ce + w_L1 * l1
             # loss = crit(output, GT.float())
             loss.backward()
             optimizer.step()
             t_loss.append(loss.item())
             dice_loss.append(dc.item())
             ce_loss.append(ce.item())
+            l1_loss.append(l1.item())
             # print('\r \t {} / {}:train_loss = {}'.format(index + 1, len(train_loader), loss.item()), end="")
             print('{} / {}: train_loss = {}'.format(index + 1, len(train_loader), loss.item()))
         print()
         model.eval()
-        # model.cpu()   ###bj  still use GPU
+        # model.cpu()   ###bj  still use GPU 
         with torch.no_grad():  ##bj
             for index, (data, GT) in enumerate(valid_loader):  ##bj
                 # valid data
@@ -521,7 +525,7 @@ if __name__ == '__main__':
                 GT = GT.to(device)
                 loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
 
-                output = output.log_softmax(dim=1).exp()  ##bj
+                output = output.log_softmax(dim=1).exp()  ##bj 
                 GT = one_hot(GT.to(torch.long), 16)
                 target = torch.permute(GT, (0, 4, 1, 2, 3))
                 v_acc.append(
@@ -537,6 +541,7 @@ if __name__ == '__main__':
         v_acc = np.mean(v_acc)  ##bj
         dice_loss = np.mean(dice_loss)
         ce_loss = np.mean(ce_loss)
+        l1_loss = np.mean(l1_loss)
         print('valid_acc = {}'.format(v_acc))
         if v_acc > max_acc:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-final.pth'))
@@ -547,11 +552,11 @@ if __name__ == '__main__':
         # valid_loss.append(v_loss)
         # valid_acc.append(v_acc)
         # # 保存训练的loss
-        wind_loss.line([[dice_loss, ce_loss, t_loss, v_loss]],  # Y的第一个点的坐标
+        wind_loss.line([[dice_loss, ce_loss, t_loss, v_loss, l1_loss]],  # Y的第一个点的坐标
                        [epoch],  # X的第一个点的坐标
                        win='train&valid_loss',  # 窗口的名称
                        update='append',
-                       opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss'])
+                       opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss', 'l1_loss'])
                        )
 
         wind_dice.line([[v_acc]],  # Y的第一个点的坐标

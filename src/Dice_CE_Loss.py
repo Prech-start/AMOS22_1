@@ -6,12 +6,12 @@ from torch.nn.modules.loss import _Loss
 import numpy as np
 import torch.nn as nn
 
-
 __all__ = ["DiceLoss", "SoftCrossEntropyLoss"]
 
 BINARY_MODE = "binary"
 MULTICLASS_MODE = "multiclass"
 MULTILABEL_MODE = "multilabel"
+
 
 def to_tensor(x, dtype=None) -> torch.Tensor:
     if isinstance(x, torch.Tensor):
@@ -32,8 +32,9 @@ def to_tensor(x, dtype=None) -> torch.Tensor:
 
     raise ValueError("Unsupported input type" + str(type(x)))
 
+
 def soft_dice_score(
-    output: torch.Tensor, target: torch.Tensor, smooth: float = 0.0, eps: float = 1e-7, dims=None
+        output: torch.Tensor, target: torch.Tensor, smooth: float = 0.0, eps: float = 1e-7, dims=None
 ) -> torch.Tensor:
     """
     :param output:
@@ -47,6 +48,14 @@ def soft_dice_score(
         - Target: :math:`(N, NC, *)`, same shape as the input
         - Output: scalar.
     """
+
+    # batch_size = output.size(0)
+    # input = output.contiguous().view(batch_size, 16, -1)
+    # target_ = target.contiguous().view(batch_size, 16, -1)
+    #
+    # inter = torch.sum(input * target_, 2) + smooth
+    # union = torch.sum(input, 2) + torch.sum(target_, 2) + smooth
+    # score = 1.0 - 2.0 * inter / union
     assert output.size() == target.size()
     if dims is not None:
         intersection = torch.sum(output * target, dim=dims)
@@ -55,7 +64,9 @@ def soft_dice_score(
         intersection = torch.sum(output * target)
         cardinality = torch.sum(output + target)
     dice_score = (2.0 * intersection + smooth) / (cardinality + smooth).clamp_min(eps)
+    # print(1 - dice_score)
     return dice_score
+
 
 class DiceLoss(_Loss):
     """
@@ -64,14 +75,15 @@ class DiceLoss(_Loss):
     """
 
     def __init__(
-        self,
-        mode: str,
-        classes: List[int] = None,
-        log_loss=False,
-        from_logits=True,
-        smooth: float = 0.0,
-        ignore_index=None,
-        eps=1e-7,
+            self,
+            mode: str,
+            classes: List[int] = None,
+            log_loss=False,
+            from_logits=True,
+            smooth: float = 0.0,
+            ignore_index=None,
+            eps=1e-7,
+            weight: List = None,
     ):
         """
         :param mode: Metric mode {'binary', 'multiclass', 'multilabel'}
@@ -97,6 +109,11 @@ class DiceLoss(_Loss):
         self.eps = eps
         self.ignore_index = ignore_index
         self.log_loss = log_loss
+        if weight is not None:
+            self.weight = torch.Tensor(weight) / np.sum(weight)
+
+        else:
+            self.weight = None
 
     def forward(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
         """
@@ -105,7 +122,11 @@ class DiceLoss(_Loss):
         :return: scalar
         """
         assert y_true.size(0) == y_pred.size(0)
-
+        if self.weight is not None:
+            self.weight = self.weight.to(y_pred.device)
+        # batch_size = y_true.size(0)
+        # input = y_pred.contiguous().view(batch_size, 16, -1)
+        # target_ = y_true.contiguous().view(batch_size, 16, -1)
         if self.from_logits:
             # Apply activations to get [0..1] class probabilities
             # Using Log-Exp as this gives more numerically stable result and does not cause vanishing gradient on
@@ -152,12 +173,14 @@ class DiceLoss(_Loss):
                 y_true = y_true * mask
 
         scores = soft_dice_score(y_pred, y_true.type_as(y_pred), smooth=self.smooth, eps=self.eps, dims=dims)
-
+        # scores.shape 16
         if self.log_loss:
             loss = -torch.log(scores.clamp_min(self.eps))
         else:
             loss = 1.0 - scores
-
+        if self.weight is not None:
+            loss = loss * self.weight
+        # print(loss.mean())
         # Dice loss is undefined for non-empty classes
         # So we zero contribution of channel that does not have true pixels
         # NOTE: A better workaround would be to use loss term `mean(y_pred)`
@@ -168,13 +191,16 @@ class DiceLoss(_Loss):
 
         if self.classes is not None:
             loss = loss[self.classes]
-        
-        return loss.mean()
-
+        # print(loss)
+        if self.weight is not None:
+            return loss.sum()
+        else:
+            return loss.mean()
 
 
 def label_smoothed_nll_loss(
-    lprobs: torch.Tensor, target: torch.Tensor, epsilon: float, ignore_index=None, reduction="mean", dim=-1
+        lprobs: torch.Tensor, target: torch.Tensor, epsilon: float, ignore_index=None, reduction="mean", dim=-1,
+        weight: torch.Tensor = None
 ) -> torch.Tensor:
     """
     Source: https://github.com/pytorch/fairseq/blob/master/fairseq/criterions/label_smoothed_cross_entropy.py
@@ -185,39 +211,48 @@ def label_smoothed_nll_loss(
     :param reduction:
     :return:
     """
+    if weight is not None:
+        weight = weight.to(lprobs.device)
     if target.dim() == lprobs.dim() - 1:
         target = target.unsqueeze(dim)
     target = target.to(torch.long)
-    if ignore_index is not None:
-        pad_mask = target.eq(ignore_index)
-        target = target.masked_fill(pad_mask, 0)
-        nll_loss = -lprobs.gather(dim=dim, index=target)
-        smooth_loss = -lprobs.sum(dim=dim, keepdim=True)
-
-        # nll_loss.masked_fill_(pad_mask, 0.0)
-        # smooth_loss.masked_fill_(pad_mask, 0.0)
-        nll_loss = nll_loss.masked_fill(pad_mask, 0.0)
-        smooth_loss = smooth_loss.masked_fill(pad_mask, 0.0)
+    if weight is not None:
+        nll_loss = F.nll_loss(lprobs, target.squeeze(0), weight=weight)
+        if ignore_index is not None:
+            pad_mask = target.eq(ignore_index)
+            smooth_loss = -lprobs.sum(dim=dim, keepdim=True)
+            smooth_loss = smooth_loss.masked_fill(pad_mask, 0.0)
+        else:
+            smooth_loss = -lprobs.sum(dim=dim, keepdim=True)
+            smooth_loss = smooth_loss.squeeze(dim)
+        if reduction == "sum":
+            smooth_loss = smooth_loss.sum()
+        if reduction == "mean":
+            smooth_loss = smooth_loss.mean()
     else:
-        nll_loss = -lprobs.gather(dim=dim, index=target)
-        smooth_loss = -lprobs.sum(dim=dim, keepdim=True)
-
-        nll_loss = nll_loss.squeeze(dim)
-        smooth_loss = smooth_loss.squeeze(dim)
-
-    if reduction == "sum":
-        nll_loss = nll_loss.sum()
-        smooth_loss = smooth_loss.sum()
-    if reduction == "mean":
-        nll_loss = nll_loss.mean()
-        smooth_loss = smooth_loss.mean()
-    if reduction == "weighted": 
-        pass
+        if ignore_index is not None:
+            pad_mask = target.eq(ignore_index)
+            target = target.masked_fill(pad_mask, 0)
+            nll_loss = -lprobs.gather(dim=dim, index=target)
+            smooth_loss = -lprobs.sum(dim=dim, keepdim=True)
+            nll_loss = nll_loss.masked_fill(pad_mask, 0.0)
+            smooth_loss = smooth_loss.masked_fill(pad_mask, 0.0)
+        else:
+            nll_loss = -lprobs.gather(dim=dim, index=target)
+            smooth_loss = -lprobs.sum(dim=dim, keepdim=True)
+            nll_loss = nll_loss.squeeze(dim)
+            smooth_loss = smooth_loss.squeeze(dim)
+        if reduction == "sum":
+            nll_loss = nll_loss.sum()
+            smooth_loss = smooth_loss.sum()
+        if reduction == "mean":
+            nll_loss = nll_loss.mean()
+            smooth_loss = smooth_loss.mean()
+            pass
 
     eps_i = epsilon / lprobs.size(dim)
     loss = (1.0 - epsilon) * nll_loss + eps_i * smooth_loss
     return loss
-
 
 
 class SoftCrossEntropyLoss(nn.Module):
@@ -225,18 +260,21 @@ class SoftCrossEntropyLoss(nn.Module):
     Drop-in replacement for nn.CrossEntropyLoss with few additions:
     - Support of label smoothing
     """
-
     __constants__ = ["reduction", "ignore_index", "smooth_factor"]
 
-    def __init__(self, reduction: str = "mean", smooth_factor: float = 0.0, ignore_index: Optional[int] = -100, dim=1):
+    def __init__(self, reduction: str = "mean", smooth_factor: float = 0.0, ignore_index: Optional[int] = -100, dim=1,
+                 weight: List = None):
         super().__init__()
         self.smooth_factor = smooth_factor
         self.ignore_index = ignore_index
         self.reduction = reduction
         self.dim = dim
+        self.weight = weight
 
     def forward(self, input: Tensor, target: Tensor) -> Tensor:
         log_prob = F.log_softmax(input, dim=self.dim)
+        if self.weight != None:
+            self.weight = torch.Tensor(self.weight)
         return label_smoothed_nll_loss(
             log_prob,
             target,
@@ -244,4 +282,5 @@ class SoftCrossEntropyLoss(nn.Module):
             ignore_index=self.ignore_index,
             reduction=self.reduction,
             dim=self.dim,
+            weight=self.weight,
         )

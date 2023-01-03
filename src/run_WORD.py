@@ -18,28 +18,94 @@ import matplotlib.pyplot as plt
 from visdom import Visdom
 import time
 
+wind_loss = Visdom()
+wind_dice = Visdom()
+# wind_loss.line([[0., 0.]],  # Y的第一个点的坐标
+#                [0.],  # X的第一个点的坐标
+#                win='train&valid_loss',  # 窗口的名称
+#                opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'valid_loss'])  # 图像的标例
+#                )
+
+wind_dice.line([[0.]],  # Y的第一个点的坐标
+               [0.],  # X的第一个点的坐标
+               win='dice',  # 窗口的名称
+               opts=dict(title='dice', legend=['dice'])  # 图像的标例
+               )
 ######################################################
 #################### DATALOADER ######################
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
-path_dir = r'/home/ljc/code/AMOS22/data/'
-task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
+path_dir = r'/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0'
+task_json = json.load(open(os.path.join(path_dir, 'dataset.json')))
 
-file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
-              os.path.join(path_dir, 'AMOS22', path_['label'])]
-             for path_ in task2_json['training']]
+file_path = [[os.path.join(path_dir, path_['image']),
+              os.path.join(path_dir, path_['label'])]
+             for path_ in task_json['training']]
+lens = len(file_path)
 
-CT_train_path = file_path[0:150]
-CT_valid_path = file_path[150:160]
-CT_test_path = file_path[160:200]
-MRI_train_path = file_path[200:230]
-MRI_valid_path = file_path[230:232]
-MRI_test_path = file_path[232::]
+CT_train_path = file_path[0:lens // 2]
+CT_valid_path = file_path[lens // 2: 3 * lens // 4]
+CT_test_path = file_path[3 * lens // 4::]
+# CT_test_path = file_path
+
+# MRI_train_path = file_path[200:230]
+# MRI_valid_path = file_path[230:232]
+# MRI_test_path = file_path[232::]
 train_path = CT_train_path  # + MRI_train_path
 valid_path = CT_valid_path  # + MRI_valid_path
 test_path = CT_test_path  # + MRI_test_path
 
-compare_path = file_path[150 - 10:150]
+'''
+AMOS22
+    "labels": {
+        "0": "background",
+        "1": "spleen",
+        "2": "right kidney",
+        "3": "left kidney",
+        "4": "gall bladder",
+        "5": "esophagus",
+        "6": "liver",
+        "7": "stomach",
+        "8": "aorta",
+        "9": "postcava",
+        "10": "pancreas",
+        "11": "right adrenal gland",
+        "12": "left adrenal gland",
+        "13": "duodenum",
+        "14": "bladder",
+        "15": "prostate/uterus"
+    }
+BTCV
+    "labels": {
+        "0": "background",
+        "1": "liver", 6
+        "2": "spleen", 1
+        "3": "left_kidney",
+        "4": "right_kidney", 2
+        "5": "stomach", 7
+        "6": "gallbladder", 4
+        "7": "esophagus", 5
+        "8": "pancreas", 10
+        "9": "duodenum", 13
+        "10": "colon", !!
+        "11": "intestine",!!
+        "12": "adrenal", !!
+        "13": "rectum", !!
+        "14": "bladder",
+        "15": "Head_of_femur_L",!!
+        "16": "Head_of_femur_R"!!
+9 = 13
+8 = 10
+1 = -1
+2 = 1
+4 = 2
+6 = 4
+-1 = 6
+5 = -1
+7 = 5
+-1 = 7
+
+'''
 
 
 class data_set(Dataset):
@@ -52,6 +118,33 @@ class data_set(Dataset):
         y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int8)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
+        y[y == 10] = 0
+        y[y == 11] = 0
+        y[y == 12] = 0
+        y[y == 13] = 0
+        y[y == 15] = 0
+        y[y == 16] = 0
+        y[y == 9] = 13
+        y[y == 8] = 10
+        y[y == 1] = -1
+        y[y == 2] = 1
+        y[y == 4] = 2
+        y[y == 6] = 4
+        y[y == -1] = 6
+        y[y == 5] = -1
+        y[y == 7] = 5
+        y[y == -1] = 7
+
+        ## 筛选
+        s = 14
+        y[y != s] = 0
+        oriimage = sitk.ReadImage(path_[item][0])
+        sitk.WriteImage(oriimage, 'a.nii.gz')
+        labeliamge_ = sitk.ReadImage(path_[item][1])
+        y = np.array(y, dtype=np.float)
+        labeliamge = sitk.GetImageFromArray(y)
+        labeliamge.CopyInformation(labeliamge_)
+        sitk.WriteImage(labeliamge, 'b.nii.gz')
         x = self.norm(x)
         x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
         y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
@@ -105,15 +198,6 @@ def get_test_data():
         dataset=data,
         batch_size=1,
         shuffle=False
-    )
-
-
-def get_compare_data():
-    data = data_set(compare_path)
-    return DataLoader(
-        dataset=data,
-        batch_size=1,
-        shuffle=False,
     )
 
 
@@ -418,45 +502,32 @@ def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4
 
 if __name__ == '__main__':
     print('beginning training')
-    wind_loss = Visdom()
-    wind_dice = Visdom()
-    # wind_loss.line([[0., 0.]],  # Y的第一个点的坐标
-    #                [0.],  # X的第一个点的坐标
-    #                win='train&valid_loss',  # 窗口的名称
-    #                opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'valid_loss'])  # 图像的标例
-    #                )
-
-    wind_dice.line([[0.]],  # Y的第一个点的坐标
-                   [0.],  # X的第一个点的坐标
-                   win='dice',  # 窗口的名称
-                   opts=dict(title='dice', legend=['dice'])  # 图像的标例
-                   )
     class_num = 16
-    learning_rate = 1e-3
+    learning_rate = 1e-2
     n_epochs = 300
     batch_size = 1
-    is_load = False
+    is_load = True
     # device = torch.device('cpu')
     device = torch.device('cuda:0')
-    strategy = 'cropped_data_weight2'
-    load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
+    # strategy_name eg. loss function name
+    strategy = 'WORD'
+    load_path = '/home/ljc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
     path = os.path.join(path_dir, 'checkpoints', strategy)
+    # path = os.path.join(path_dir, 'checkpoints', strategy)
     if not os.path.exists(path):
         os.makedirs(path)
-    # path = os.path.join(path_dir, 'checkpoints', strategy)
     model = UnetModel(1, 16, 6)
-    # loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
-    loss_weight = [1, 1.02, 1.03, 1.03, 0.88, 0.87, 1.04, 0.91, 1.03, 1.01, 0.90, 0.91, 0.83, 0.85, 0.86, 0.86]
+    loss_weight = [1, 2, 2, 3, 6, 6, 1, 4, 3, 4, 7, 8, 10, 5, 4, 5]
     loss1 = ComboLoss_wbce_dice(loss_weight)
     loss2 = ComboLoss_wbce_ndice(loss_weight)
     # crit = loss2
 
     from Dice_CE_Loss import DiceLoss, SoftCrossEntropyLoss
 
-    loss3_dice = DiceLoss(mode='multiclass', weight=loss_weight)  ##bj
-    loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0, weight=loss_weight)  ##bj
+    loss3_dice = DiceLoss(mode='multiclass')  ##bj
+    loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0)  ##bj
     w_dice = 1.0
     w_ce = 1.0
     # choice loss function
@@ -470,8 +541,7 @@ if __name__ == '__main__':
     valid_acc = []
     max_acc = 0.
     if is_load:
-        model.load_state_dict(torch.load(load_path))
-
+        model.load_state_dict(torch.load(load_path, map_location='cuda:0'))
     for epoch in range(1, n_epochs + 1):
         t_loss = []
         v_loss = []
@@ -480,17 +550,14 @@ if __name__ == '__main__':
         ce_loss = []
         model.train()
         model.to(device)
-        if epoch == 150:
-            learning_rate = 1e-4
-            optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT) in enumerate(train_loader):
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
             data = data.float().to(device)
             GT = GT.to(device)
-            # GT = one_hot(GT, 16)
-            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3))
+            # GT = one_hot(GT, 16) 
+            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3)) 
             # # GT = rearrange(GT, 'b d w h c -> b c d w h')
             # training param
             output = model(data)
@@ -509,7 +576,7 @@ if __name__ == '__main__':
             print('{} / {}: train_loss = {}'.format(index + 1, len(train_loader), loss.item()))
         print()
         model.eval()
-        # model.cpu()   ###bj  still use GPU
+        # model.cpu()   ###bj  still use GPU 
         with torch.no_grad():  ##bj
             for index, (data, GT) in enumerate(valid_loader):  ##bj
                 # valid data
@@ -521,7 +588,7 @@ if __name__ == '__main__':
                 GT = GT.to(device)
                 loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
 
-                output = output.log_softmax(dim=1).exp()  ##bj
+                output = output.log_softmax(dim=1).exp()  ##bj 
                 GT = one_hot(GT.to(torch.long), 16)
                 target = torch.permute(GT, (0, 4, 1, 2, 3))
                 v_acc.append(
@@ -543,9 +610,9 @@ if __name__ == '__main__':
             max_acc = v_acc
         if epoch % 10 == 0:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch + 1)))
-        # train_loss.append(t_loss)
-        # valid_loss.append(v_loss)
-        # valid_acc.append(v_acc)
+        train_loss.append(t_loss)
+        valid_loss.append(v_loss)
+        valid_acc.append(v_acc)
         # # 保存训练的loss
         wind_loss.line([[dice_loss, ce_loss, t_loss, v_loss]],  # Y的第一个点的坐标
                        [epoch],  # X的第一个点的坐标
