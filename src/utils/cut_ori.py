@@ -19,8 +19,13 @@ def cut_(ori_path, gt_path, save_path, spacing=None):
         pre_cut_ori_image = norm(ori_image).squeeze()
     else:
         pre_cut_ori_image = ori_image.squeeze()
-    pre_cut_ori_image = get_mask(pre_cut_ori_image)
-    x_list, y_list, z_list = np.where(pre_cut_ori_image > 0)
+    mask = get_mask(pre_cut_ori_image)
+    background_pixel_value = np.min(ori_image)
+    ori_image *= mask
+    # gt_image *= mask
+    ori_image[mask == 0] = background_pixel_value
+    # gt_image[mask == 0] = background_pixel_value
+    x_list, y_list, z_list = np.where(mask > 0)
     x_max, y_max, z_max = np.max(x_list), np.max(y_list), np.max(z_list)
     x_min, y_min, z_min = np.min(x_list), np.min(y_list), np.min(z_list)
     print('from shape:{}'.format(ori_image.shape))
@@ -62,6 +67,8 @@ def get_mask(img: np.ndarray):
     from skimage.morphology import label
     from collections import OrderedDict
     import skimage
+    kernel = skimage.morphology.ball(2)
+    label_np = skimage.morphology.erosion(label_np, kernel)
     region_volume = OrderedDict()
     label_map, numregions = label(label_np == 1, return_num=True)
     region_volume['num_region'] = numregions
@@ -87,9 +94,9 @@ def get_mask(img: np.ndarray):
 if __name__ == '__main__':
     # ori_path, gt_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr/amos_0001.nii.gz', '/home/ljc/code/AMOS22/data/AMOS22/labelsTr/amos_0001.nii.gz'
     # cut_(ori_path, gt_path, '/home/ljc/code/AMOS22/data/AMOS22/')
-    ori_root_path = '/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/imagesTr/'
-    gt_root_path = '/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/labelsTr/'
-    save_path = '/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/'
+    ori_root_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr'
+    gt_root_path = '/home/ljc/code/AMOS22/data/AMOS22/labelsTr'
+    save_path = '/home/ljc/code/AMOS22/data/AMOS22/'
     ori_paths = os.listdir(ori_root_path)
     gt_paths = os.listdir(gt_root_path)
     ori_paths.sort()

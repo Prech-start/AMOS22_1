@@ -12,20 +12,21 @@ from einops import rearrange
 import os.path
 import pickle
 import matplotlib
+import numpy
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from visdom import Visdom
 import time
-from src.utils.trans_to_pointcloud import cal_centre_point_3
 
 ######################################################
 #################### DATALOADER ######################
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
-path_dir = r'../data/'
-# path_dir = r'/home/ljc/code/AMOS22/data/'
-task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'task2_dataset.json')))
+# path_dir = r'../data/'
+path_dir = r'/home/ljc/code/AMOS22/data/'
+# path_dir = r'/nas/luojc/code/AMOS22/data'
+task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
               os.path.join(path_dir, 'AMOS22', path_['label'])]
@@ -42,6 +43,58 @@ valid_path = CT_valid_path  # + MRI_valid_path
 test_path = CT_test_path  # + MRI_test_path
 
 
+def cal_centre_point_4(label_arr: numpy.ndarray, label_file_path: str, r: int = 10, small_organ: list = None,
+                       spacing=None):
+    start_time = time.time()
+    file_name = label_file_path.split('/')[-1].split('.')[0]
+    path_dir = os.path.dirname(__file__)
+    file_path = os.path.join(path_dir, '..', 'data', 'pointcloud6')
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    save_path = os.path.join(file_path, '{}.npy'.format(file_name))
+    label_arr_ = torch.nn.functional.one_hot(torch.LongTensor(label_arr), 16).permute(-1, 0, 1, 2)
+    if not os.path.exists(save_path):
+        centre_arr = np.zeros_like(label_arr_).astype(np.float32)
+        for i in np.unique(label_arr).astype(int).tolist():
+            if i == 0:
+                continue
+            # 对于不同大小的器官，r的取值也不一样
+            # if i in small organ_list
+            # r = 2/3 max_distance_from_pixel_to_centre
+            class_xyz = np.array(np.where(label_arr_[i, ...] == 1))
+            class_all = np.array(np.where(label_arr_[i, ...] != -1))
+            class_xyz = np.r_[np.ones((1, class_xyz.shape[-1])) * i, class_xyz].astype(int)
+            class_all = np.r_[np.ones((1, class_all.shape[-1])) * i, class_all].astype(int)
+            c, x, y, z = np.mean(class_xyz, 1, dtype=int)
+            # 求中心点坐标
+            centre_arr[i, x, y, z] = 1
+            # 求每个label点到中心的点的距离
+            distance_for_xyz = np.linalg.norm(class_xyz.T - [i, x, y, z], axis=1)  # N * 1
+            if i in small_organ:
+                r = 2 / 3 * np.max(distance_for_xyz)
+            distance_for_xyz = np.linalg.norm(class_all.T - [i, x, y, z], axis=1)  # N * 1
+            # 筛选出distance中距离小于r的所有坐标 type:tuple
+            dis = np.where(distance_for_xyz < r)
+            # 筛选出到中心点距离小于r的所有坐标
+            distance_list = distance_for_xyz[dis]
+            # 将每个筛选出的点进行赋值
+            centre_arr[tuple(class_all.T[dis].T.tolist())] = (r - distance_list) / r
+            # if i in small_organ:
+            #     # 第i个通道的数据取出来做spacing
+            #     array = centre_arr[i, ...]
+            #     IMAGE = sitk.GetImageFromArray(array)
+            #     IMAGE.SetSpacing(spacing)
+            #     # 保存到桌面
+            #     filename = 'test.nii.gz'
+            #     sitk.WriteImage(IMAGE, filename)
+            #     pass
+        np.save(save_path, centre_arr)
+        print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
+        return centre_arr
+    # print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
+    return np.load(save_path).astype(np.int8)
+
+
 class data_set(Dataset):
     def __init__(self, file_path):
         self.paths = file_path
@@ -52,12 +105,13 @@ class data_set(Dataset):
         y = sitk.GetArrayFromImage(sitk.ReadImage(path_[item][1])).astype(np.int16)
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
-        x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
-        y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        x = resize(x, (320, 160, 160), order=1, preserve_range=True, anti_aliasing=False)
+        y = resize(y, (320, 160, 160), order=0, preserve_range=True, anti_aliasing=False)
         x = self.norm(x)
         # x = self.Standardization(x)
         # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-        z = cal_centre_point_4(y.squeeze(), path_[item][1], r=10)
+        small_organ = [4, 5, 10, 11, 12, 13, 14, 15]
+        z = cal_centre_point_4(y.squeeze(), path_[item][1], r=10, small_organ=small_organ)
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
         z = torch.from_numpy(z).type(torch.FloatTensor)
@@ -109,6 +163,18 @@ def get_test_data():
         dataset=data,
         batch_size=1,
         shuffle=False
+    )
+
+
+compare_path = file_path[150 - 10:150]
+
+
+def get_compare_data():
+    data = data_set(compare_path)
+    return DataLoader(
+        dataset=data,
+        batch_size=1,
+        shuffle=False,
     )
 
 
@@ -416,27 +482,15 @@ def calculate_acc(output, target, class_num, fun, is_training=False, smooth=1e-4
 
 if __name__ == '__main__':
     print('beginning training')
-    wind_loss = Visdom()
-    wind_dice = Visdom()
-    # wind_loss.line([[0., 0.]],  # Y的第一个点的坐标
-    #                [0.],  # X的第一个点的坐标
-    #                win='train&valid_loss',  # 窗口的名称
-    #                opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'valid_loss'])  # 图像的标例
-    #                )
 
-    wind_dice.line([[0.]],  # Y的第一个点的坐标
-                   [0.],  # X的第一个点的坐标
-                   win='dice',  # 窗口的名称
-                   opts=dict(title='dice', legend=['dice'])  # 图像的标例
-                   )
     class_num = 16
     learning_rate = 1e-3
     n_epochs = 300
     batch_size = 1
     is_load = False
-    # device = torch.device('cpu')
-    device = torch.device('cuda:1')
-    strategy = 'cropped_data'
+    device = torch.device('cpu')
+    # device = torch.device('cuda:0')
+    strategy = 'centre_final_01'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
@@ -454,6 +508,7 @@ if __name__ == '__main__':
 
     loss3_dice = DiceLoss(mode='multiclass', weight=loss_weight)  ##bj
     loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0, weight=loss_weight)  ##bj
+
     loss5_L1 = torch.nn.SmoothL1Loss()
     w_dice = 1.0
     w_ce = 1.0
@@ -471,6 +526,15 @@ if __name__ == '__main__':
     if is_load:
         model.load_state_dict(torch.load(load_path))
 
+    wind_loss = Visdom(env=strategy)
+    wind_dice = Visdom(env=strategy)
+
+    wind_dice.line([[0.]],  # Y的第一个点的坐标
+                   [0.],  # X的第一个点的坐标
+                   win='dice',  # 窗口的名称
+                   opts=dict(title='dice', legend=['dice'])  # 图像的标例
+                   )
+
     for epoch in range(1, n_epochs + 1):
         w_L1 = weight = ((epoch - n_epochs) ** 2) / ((1 - n_epochs) ** 2)
         t_loss = []
@@ -481,17 +545,33 @@ if __name__ == '__main__':
         l1_loss = []
         model.train()
         model.to(device)
-        if epoch == 150:
+        if epoch == 200:
             learning_rate = 1e-4
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT, C_GT) in enumerate(train_loader):
+            save_path = os.path.join('output', 'AMOS_CENTRE', str(index))
+            for i in range(data.squeeze().shape[0]):
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                plt.imsave(os.path.join(save_path, str(i) + '.png'), data.squeeze()[i, ...], cmap='gray')
+                GT[GT != 4] = 0
+                plt.imsave(os.path.join(save_path, str(i) + '_GT.png'), GT.squeeze()[i, ...], cmap='gray')
+                for j in range(C_GT.squeeze().shape[0]):
+                    save_path_ = os.path.join(save_path, str(j))
+                    if not os.path.exists(save_path_):
+                        os.makedirs(save_path_)
+                    plt.imsave(os.path.join(save_path_, str(i) + '_CGT.png'), C_GT.squeeze()[j, i, ...], cmap='gray')
+            print('finish')
+            pass
+            continue
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
             data = data.float().to(device)
             GT = GT.to(device)
-            # GT = one_hot(GT, 16) 
-            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3)) 
+            C_GT = C_GT.to(device)
+            # GT = one_hot(GT, 16)
+            # GT = torch.permute(GT, ( 0, 4, 1, 2, 3))
             # # GT = rearrange(GT, 'b d w h c -> b c d w h')
             # training param
             output, C_output = model(data)
@@ -513,19 +593,19 @@ if __name__ == '__main__':
             print('{} / {}: train_loss = {}'.format(index + 1, len(train_loader), loss.item()))
         print()
         model.eval()
-        # model.cpu()   ###bj  still use GPU 
+        # model.cpu()   ###bj  still use GPU
         with torch.no_grad():  ##bj
-            for index, (data, GT) in enumerate(valid_loader):  ##bj
+            for index, (data, GT, _) in enumerate(valid_loader):  ##bj
                 # valid data
                 # GT = one_hot(GT, 16)
                 # target = torch.permute(GT, ( 0, 4, 1, 2, 3))
                 # # target = rearrange(GT, 'b d w h c -> b c d w h')
                 # training param
-                output = model(data.float().to(device))  ##bj
+                output, _ = model(data.float().to(device))  ##bj
                 GT = GT.to(device)
                 loss = w_dice * loss3_dice(output, GT) + w_ce * loss4_ce(output, GT)
 
-                output = output.log_softmax(dim=1).exp()  ##bj 
+                output = output.log_softmax(dim=1).exp()  ##bj
                 GT = one_hot(GT.to(torch.long), 16)
                 target = torch.permute(GT, (0, 4, 1, 2, 3))
                 v_acc.append(
@@ -552,11 +632,11 @@ if __name__ == '__main__':
         # valid_loss.append(v_loss)
         # valid_acc.append(v_acc)
         # # 保存训练的loss
-        wind_loss.line([[dice_loss, ce_loss, t_loss, v_loss, l1_loss]],  # Y的第一个点的坐标
+        wind_loss.line([[dice_loss, ce_loss, (dice_loss + ce_loss) / 2, v_loss]],  # Y的第一个点的坐标
                        [epoch],  # X的第一个点的坐标
                        win='train&valid_loss',  # 窗口的名称
                        update='append',
-                       opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss', 'l1_loss'])
+                       opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss'])
                        )
 
         wind_dice.line([[v_acc]],  # Y的第一个点的坐标

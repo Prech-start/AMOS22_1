@@ -59,7 +59,7 @@ def GetEvaluation(SR: Tensor, GT: Tensor, EVALS: list = EVALUATIONS):
     return [acc, sensitivity, specificity, precision, f1, js, dice]
 
 
-from run import get_test_data, UnetModel, get_train_data, get_compare_data
+from run_centre import get_test_data, UnetModel, get_train_data, get_compare_data
 
 
 def cal_dice_loss(model_path: str, dataloader):
@@ -69,8 +69,8 @@ def cal_dice_loss(model_path: str, dataloader):
     # dc = DiceLoss(mode='multiclass')
     table = np.zeros((16, len(EVALUATIONS)))
     mask = np.ones((16, 1))
-    for ori, gt in tqdm(dataloader):
-        pred = model(ori.float())
+    for ori, gt, _ in tqdm(dataloader):
+        pred,_ = model(ori.float())
         pred = torch.argmax(pred, 1).squeeze()
         for i in range(16):
             if i == 0:

@@ -23,7 +23,7 @@ import time
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
 path_dir = r'/home/ljc/code/AMOS22/data/'
-task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
+task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'task2_dataset.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
               os.path.join(path_dir, 'AMOS22', path_['label'])]
@@ -53,8 +53,10 @@ class data_set(Dataset):
         x = np.array(x, dtype=float)
         y = np.array(y, dtype=int)
         x = self.norm(x)
-        x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
-        y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        x = resize(x, (320, 160, 160), order=1, preserve_range=True, anti_aliasing=False)
+        y = resize(y, (320, 160, 160), order=0, preserve_range=True, anti_aliasing=False)
+        # x = resize(x, (192, 192, 192), order=1, preserve_range=True, anti_aliasing=False)
+        # y = resize(y, (192, 192, 192), order=0, preserve_range=True, anti_aliasing=False)
         x = torch.from_numpy(x).type(torch.FloatTensor)
         y = torch.from_numpy(y).type(torch.LongTensor)
         return x.unsqueeze_(0), y
@@ -436,9 +438,9 @@ if __name__ == '__main__':
     n_epochs = 300
     batch_size = 1
     is_load = False
-    # device = torch.device('cpu')
-    device = torch.device('cuda:0')
-    strategy = 'cropped_data_weight2'
+    device = torch.device('cpu')
+    # device = torch.device('cuda:0')
+    strategy = 'crop_data_weight_final'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
@@ -484,6 +486,12 @@ if __name__ == '__main__':
             learning_rate = 1e-4
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT) in enumerate(train_loader):
+            save_path = os.path.join('output', 'AMOS', str(index))
+            for i in range(data.squeeze().shape[0]):
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                plt.imsave(os.path.join(save_path, str(i) + '.png'), data.squeeze()[i,...], cmap='gray')
+            continue
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot

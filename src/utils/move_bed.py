@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 import SimpleITK as sitk
 
-x = sitk.GetArrayFromImage(sitk.ReadImage('amos_0001.nii.gz'))
+x = sitk.GetArrayFromImage(sitk.ReadImage('/media/ljc/ugreen/dataset/WORD/WORD-V0.1.0/imagesTr/word_0002.nii.gz'))
 
 # img = Image.open(
 #     "001.png")
@@ -26,14 +26,15 @@ import numpy as np
 from skimage.morphology import label
 from collections import OrderedDict
 from batchgenerators.utilities.file_and_folder_operations import *
-
+import skimage
 # label_path = "/Users/cengwankang/Downloads/Kidney_Stone/data_origin/ZengGuiXing/segmentation_only_stone.mha"
 # label_path = "/Users/cengwankang/Downloads/shenzheng/li-xiao-mei/segmentation_stone.nii.gz"
 # label_image = sitk.ReadImage(label_path)
 # label_np = sitk.GetArrayFromImage(label_image).astype(np.uint8)
 # print("label space: ", label_image.GetSpacing())
 # volume_per_volume = np.prod(label_image.GetSpacing())
-
+kernel = skimage.morphology.ball(2)
+label_np = skimage.morphology.erosion(label_np, kernel)
 
 region_volume = OrderedDict()
 label_map, numregions = label(label_np == 1, return_num=True)
