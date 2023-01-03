@@ -211,7 +211,7 @@ def label_smoothed_nll_loss(
     :param reduction:
     :return:
     """
-    if weight is not None:
+    if weight is not None and not weight.device == lprobs.device:
         weight = weight.to(lprobs.device)
     if target.dim() == lprobs.dim() - 1:
         target = target.unsqueeze(dim)
@@ -274,7 +274,7 @@ class SoftCrossEntropyLoss(nn.Module):
     def forward(self, input: Tensor, target: Tensor) -> Tensor:
         log_prob = F.log_softmax(input, dim=self.dim)
         if self.weight != None:
-            self.weight = torch.Tensor(self.weight)
+            self.weight = torch.FloatTensor(self.weight)
         return label_smoothed_nll_loss(
             log_prob,
             target,

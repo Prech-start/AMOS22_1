@@ -117,8 +117,8 @@ class data_set(Dataset):
         y[y == 12] = 11
         y[y == 13] = 12
         x = self.norm(x)
-        x = resize(x, (64, 256, 256), order=1, preserve_range=True, anti_aliasing=False)
-        y = resize(y, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
+        x = resize(x, (320, 160, 160), order=1, preserve_range=True, anti_aliasing=False)
+        y = resize(y, (320, 160, 160), order=0, preserve_range=True, anti_aliasing=False)
         x = torch.from_numpy(x).type(torch.FloatTensor)
         y = torch.from_numpy(y).type(torch.LongTensor)
         return x.unsqueeze_(0), y
@@ -525,6 +525,12 @@ if __name__ == '__main__':
             learning_rate = 1e-4
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT) in enumerate(train_loader):
+            save_path = os.path.join('output', 'BTCV', str(index))
+            for i in range(data.squeeze().shape[0]):
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                plt.imsave(os.path.join(save_path, str(i) + '.png'), data.squeeze()[i, ...], cmap='gray')
+            continue
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
