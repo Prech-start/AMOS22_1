@@ -94,9 +94,9 @@ def get_mask(img: np.ndarray):
 if __name__ == '__main__':
     # ori_path, gt_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr/amos_0001.nii.gz', '/home/ljc/code/AMOS22/data/AMOS22/labelsTr/amos_0001.nii.gz'
     # cut_(ori_path, gt_path, '/home/ljc/code/AMOS22/data/AMOS22/')
-    ori_root_path = '/home/ljc/code/AMOS22/data/AMOS22/imagesTr'
-    gt_root_path = '/home/ljc/code/AMOS22/data/AMOS22/labelsTr'
-    save_path = '/home/ljc/code/AMOS22/data/AMOS22/'
+    ori_root_path = 'G:\AMOS22\data\AMOS22\imagesTr'
+    gt_root_path = 'G:\AMOS22\data\AMOS22\labelsTr'
+    save_path = 'G:\AMOS22\data\AMOS22'
     ori_paths = os.listdir(ori_root_path)
     gt_paths = os.listdir(gt_root_path)
     ori_paths.sort()

@@ -24,7 +24,7 @@ import time
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
 # path_dir = r'../data/'
-path_dir = r'/home/ljc/code/AMOS22/data/'
+path_dir = r'G:\AMOS22\data'
 # path_dir = r'/nas/luojc/code/AMOS22/data'
 task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
 
@@ -488,9 +488,9 @@ if __name__ == '__main__':
     n_epochs = 300
     batch_size = 1
     is_load = False
-    device = torch.device('cpu')
-    # device = torch.device('cuda:0')
-    strategy = 'centre_final_01'
+    # device = torch.device('cpu')
+    device = torch.device('cuda:0')
+    strategy = 'centre_final_04'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
@@ -509,7 +509,7 @@ if __name__ == '__main__':
     loss3_dice = DiceLoss(mode='multiclass', weight=loss_weight)  ##bj
     loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0, weight=loss_weight)  ##bj
 
-    loss5_L1 = torch.nn.SmoothL1Loss()
+    loss5_L1 = torch.nn.SmoothL1Loss(beta=0.5, reduction='sum')
     w_dice = 1.0
     w_ce = 1.0
     w_L1 = 0.1
@@ -528,6 +528,7 @@ if __name__ == '__main__':
 
     wind_loss = Visdom(env=strategy)
     wind_dice = Visdom(env=strategy)
+    wind_L1 = Visdom(env=strategy)
 
     wind_dice.line([[0.]],  # Y的第一个点的坐标
                    [0.],  # X的第一个点的坐标
@@ -536,7 +537,7 @@ if __name__ == '__main__':
                    )
 
     for epoch in range(1, n_epochs + 1):
-        w_L1 = weight = ((epoch - n_epochs) ** 2) / ((1 - n_epochs) ** 2)
+        w_L1 = 1e-5 * ((epoch - n_epochs) ** 2) / ((1 - n_epochs) ** 2)
         t_loss = []
         v_loss = []
         v_acc = []
@@ -550,20 +551,20 @@ if __name__ == '__main__':
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT, C_GT) in enumerate(train_loader):
             save_path = os.path.join('output', 'AMOS_CENTRE', str(index))
-            for i in range(data.squeeze().shape[0]):
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
-                plt.imsave(os.path.join(save_path, str(i) + '.png'), data.squeeze()[i, ...], cmap='gray')
-                GT[GT != 4] = 0
-                plt.imsave(os.path.join(save_path, str(i) + '_GT.png'), GT.squeeze()[i, ...], cmap='gray')
-                for j in range(C_GT.squeeze().shape[0]):
-                    save_path_ = os.path.join(save_path, str(j))
-                    if not os.path.exists(save_path_):
-                        os.makedirs(save_path_)
-                    plt.imsave(os.path.join(save_path_, str(i) + '_CGT.png'), C_GT.squeeze()[j, i, ...], cmap='gray')
-            print('finish')
-            pass
-            continue
+            # for i in range(data.squeeze().shape[0]):
+            #     if not os.path.exists(save_path):
+            #         os.makedirs(save_path)
+            #     plt.imsave(os.path.join(save_path, str(i) + '.png'), data.squeeze()[i, ...], cmap='gray')
+            #     GT[GT != 4] = 0
+            #     plt.imsave(os.path.join(save_path, str(i) + '_GT.png'), GT.squeeze()[i, ...], cmap='gray')
+            #     for j in range(C_GT.squeeze().shape[0]):
+            #         save_path_ = os.path.join(save_path, str(j))
+            #         if not os.path.exists(save_path_):
+            #             os.makedirs(save_path_)
+            #         plt.imsave(os.path.join(save_path_, str(i) + '_CGT.png'), C_GT.squeeze()[j, i, ...], cmap='gray')
+            # print('finish')
+            # pass
+            # continue
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
@@ -613,6 +614,7 @@ if __name__ == '__main__':
                                   is_training=True))
                 v_loss.append(loss.item())
                 print('    {} / {}: valid_loss = {}'.format(index + 1, len(valid_loader), loss.item()))
+
         # 每次保存最新的模型
         torch.save(model.state_dict(), os.path.join(path, 'Unet-new.pth'))
         # 保存最好的模型
@@ -628,10 +630,10 @@ if __name__ == '__main__':
             max_acc = v_acc
         if epoch % 10 == 0:
             torch.save(model.state_dict(), os.path.join(path, 'Unet-{}.pth'.format(epoch + 1)))
-        # train_loss.append(t_loss)
-        # valid_loss.append(v_loss)
-        # valid_acc.append(v_acc)
-        # # 保存训练的loss
+        train_loss.append(t_loss)
+        valid_loss.append(v_loss)
+        valid_acc.append(v_acc)
+        # 保存训练的loss
         wind_loss.line([[dice_loss, ce_loss, (dice_loss + ce_loss) / 2, v_loss]],  # Y的第一个点的坐标
                        [epoch],  # X的第一个点的坐标
                        win='train&valid_loss',  # 窗口的名称
@@ -643,4 +645,10 @@ if __name__ == '__main__':
                        [epoch],  # X的第一个点的坐标
                        win='dice',  # 窗口的名称
                        update='append')  # 图像的标例
+        wind_L1.line([[l1_loss]],  # Y的第一个点的坐标
+                     [epoch],  # X的第一个点的坐标
+                     win='L1',  # 窗口的名称
+                     update='append',
+                     opts=dict(title='L1', legend=['centre_loss'])
+                     )
         time.sleep(0.5)
