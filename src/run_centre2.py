@@ -24,8 +24,8 @@ import time
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
 # path_dir = r'../data/'
-path_dir = r'/home/ljc/code/AMOS22/data/'
-# path_dir = r'/nas/luojc/code/AMOS22/data'
+# path_dir = r'/home/ljc/code/AMOS22/data/'
+path_dir = r'/nas/luojc/code/AMOS22/data'
 task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
@@ -45,52 +45,55 @@ test_path = CT_test_path  # + MRI_test_path
 
 def cal_centre_point_5(label_arr: numpy.ndarray, label_file_path: str, r: int = 10, small_organ: list = None,
                        spacing=None):
-    start_time = time.time()
-    file_name = label_file_path.split('/')[-1].split('.')[0]
-    path_dir = os.path.dirname(__file__)
-    file_path = os.path.join(path_dir, '..', 'data', 'pointcloud7')
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    save_path = os.path.join(file_path, '{}.npy'.format(file_name))
-    target = np.zeros([1, 3])
-    if not os.path.exists(save_path):
-        centre_arr = np.zeros_like(label_arr).astype(np.float32)
-        for i in np.unique(label_arr).astype(int).tolist():
-            if i == 0:
-                continue
-            # 对于不同大小的器官，r的取值也不一样
-            class_xyz = np.array(np.where(label_arr == i))
-            class_all = np.array(np.where(label_arr != -1))
-            # 求中心点坐标
-            x, y, z = np.mean(class_xyz, 1, dtype=int)
-            # 求每个label点到中心的点的距离
-            distance_for_xyz = np.linalg.norm(class_xyz.T - [x, y, z], axis=1)  # N * 1
-            if i in small_organ:
-                r = 1 / 3 * np.max(distance_for_xyz)
-            distance_for_xyz = np.linalg.norm(class_all.T - [x, y, z], axis=1)  # N * 1
-            # 筛选出distance中距离小于r的所有坐标 type:tuple
-            dis = np.where(distance_for_xyz < r)
-            # 求出所有点坐标
-            points = class_all.T[dis]
-            labels = i * np.ones((1, 3))
-            target = np.concatenate((target, labels), axis=0)
-            target = np.concatenate((target, points), axis=0)
+    # start_time = time.time()
+    # file_name = label_file_path.split('/')[-1].split('.')[0]
+    # path_dir = os.path.dirname(__file__)
+    # file_path = os.path.join(path_dir, '..', 'data', 'pointcloud7')
+    # if not os.path.exists(file_path):
+    #     os.makedirs(file_path)
+    # save_path = os.path.join(file_path, '{}.npy'.format(file_name))
+    target = np.ones([16, 3]) * -1
+    # if not os.path.exists(save_path):
+        # centre_arr = np.zeros_like(label_arr).astype(np.float32)
+    for i in np.unique(label_arr).astype(int).tolist():
+        if i == 0:
+            continue
+        # 对于不同大小的器官，r的取值也不一样
+        class_xyz = np.array(np.where(label_arr == i))
+        # class_all = np.array(np.where(label_arr != -1))
+        # 求中心点坐标
+        x, y, z = np.mean(class_xyz, 1, dtype=int)
+        target[i] = [x, y, z]
+            # # 求每个label点到中心的点的距离
+            # distance_for_xyz = np.linalg.norm(class_xyz.T - [x, y, z], axis=1)  # N * 1
             # if i in small_organ:
-            #     # 第i个通道的数据取出来做spacing
-            #     array = centre_arr[i, ...]
-            #     IMAGE = sitk.GetImageFromArray(array)
-            #     IMAGE.SetSpacing(spacing)
-            #     # 保存到桌面
-            #     filename = 'test.nii.gz'
-            #     sitk.WriteImage(IMAGE, filename)
-            #     pass
+            #     r = 1 / 3 * np.max(distance_for_xyz)
+            # distance_for_xyz = np.linalg.norm(class_all.T - [x, y, z], axis=1)  # N * 1
+            # # 筛选出distance中距离小于r的所有坐标 type:tuple
+            # dis = np.where(distance_for_xyz < r)
+            # # 求出所有点坐标
+            # points = class_all.T[dis]
+            # labels = i * np.ones((1, 3))
+            # target = np.concatenate((target, labels), axis=0)
+            # target = np.concatenate((target, points), axis=0)
+            # # if i in small_organ:
+            # #     # 第i个通道的数据取出来做spacing
+            # #     array = centre_arr[i, ...]
+            # #     IMAGE = sitk.GetImageFromArray(array)
+            # #     IMAGE.SetSpacing(spacing)
+            # #     # 保存到桌面
+            # #     filename = 'test.nii.gz'
+            # #     sitk.WriteImage(IMAGE, filename)
+            # #     pass
         # print(target)
+        # if target.shape[0] != 62101:
+        #     target = np.concatenate((target, -1 * np.ones((62101 - target.shape[0], 3))), axis=0)
         # pass
-        np.save(save_path, target)
-        print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
-        return target
+        # np.save(save_path, target)
+        # print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
+    return target
     # print('data {} processing is finished, it cost {}(s)'.format(file_name, time.time() - start_time))
-    return np.load(save_path).astype(np.int8)
+    # return np.load(save_path).astype(np.int8)
 
 
 class data_set(Dataset):
@@ -108,7 +111,8 @@ class data_set(Dataset):
         x = self.norm(x)
         # x = self.Standardization(x)
         # z = resize(z, (64, 256, 256), order=0, preserve_range=True, anti_aliasing=False)
-        small_organ = [4, 5, 10, 11, 12, 13, 14, 15]
+        # small_organ = [4, 5, 10, 11, 12, 13, 14, 15]
+        small_organ = []
         z = cal_centre_point_5(y.squeeze(), path_[item][1], r=10, small_organ=small_organ)
         x = torch.from_numpy(x).type(torch.FloatTensor).unsqueeze_(0)
         y = torch.from_numpy(y).type(torch.FloatTensor)
@@ -276,14 +280,35 @@ class DecoderBlock(nn.Module):
         return x
 
 
+class Down_a(nn.Module):
+    def __init__(self, in_channel, out_channel):
+        super(Down_a, self).__init__()
+        self.conv1 = nn.Conv3d(in_channels=in_channel, out_channels=in_channel * 2, kernel_size=2, stride=2)
+        self.conv2 = nn.Conv3d(in_channels=in_channel * 2, out_channels=in_channel * 2, kernel_size=4, stride=4)
+        self.conv3 = nn.Conv3d(in_channels=in_channel * 2, out_channels=in_channel, kernel_size=2, stride=2)
+        self.pooling = nn.AdaptiveAvgPool3d(output_size=2)
+        self.linear1 = nn.Linear(8, 6)
+        self.linear2 = nn.Linear(6, 3)
+
+    def forward(self, x):
+        b, c = x.shape[0], x.shape[1]
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = F.relu(self.pooling(x))
+        x = x.flatten().reshape(b, c, -1)
+        x = torch.sigmoid(self.linear1(x))
+        x = self.linear2(x)
+        return x
+
+
 class UnetModel(nn.Module):
 
     def __init__(self, in_channels, out_channels, model_depth=4, final_activation="softmax"):
         super(UnetModel, self).__init__()
         self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
         self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
-        # self.decoder_centre = DecoderBlock(out_channels=1, model_depth=model_depth)
-        self.centre_head = ConvBlock(out_channels, out_channels)
+        self.centre_head = Down_a(out_channels, out_channels)
         if final_activation == "sigmoid":
             self.sigmoid = nn.Sigmoid()
         else:
@@ -295,7 +320,7 @@ class UnetModel(nn.Module):
         # seg_x = self.sigmoid(seg_x)   ##bj
         # # print("Final output shape: ", x.shape)
         centre = self.centre_head(seg_x)
-        centre = self.sigmoid(centre)
+        # centre = self.sigmoid(centre)
         return seg_x, centre
 
 
@@ -486,9 +511,9 @@ if __name__ == '__main__':
     n_epochs = 300
     batch_size = 1
     is_load = False
-    device = torch.device('cpu')
-    # device = torch.device('cuda:0')
-    strategy = 'centre_final_01'
+    # device = torch.device('cpu')
+    device = torch.device('cuda:0')
+    strategy = 'centre_point'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
@@ -526,7 +551,7 @@ if __name__ == '__main__':
 
     wind_loss = Visdom(env=strategy)
     wind_dice = Visdom(env=strategy)
-
+    wind_l1 = Visdom(env=strategy)
     wind_dice.line([[0.]],  # Y的第一个点的坐标
                    [0.],  # X的第一个点的坐标
                    win='dice',  # 窗口的名称
@@ -547,7 +572,7 @@ if __name__ == '__main__':
             learning_rate = 1e-4
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT, C_GT) in enumerate(train_loader):
-            save_path = os.path.join('output', 'AMOS_CENTRE', str(index))
+            # save_path = os.path.join('output', 'AMOS_CENTRE', str(index))
             # for i in range(data.squeeze().shape[0]):
             #     if not os.path.exists(save_path):
             #         os.makedirs(save_path)
@@ -560,8 +585,9 @@ if __name__ == '__main__':
             #             os.makedirs(save_path_)
             #         plt.imsave(os.path.join(save_path_, str(i) + '_CGT.png'), C_GT.squeeze()[j, i, ...], cmap='gray')
             # print('finish')
-            pass
-            continue
+            # print(C_GT.shape)
+            # pass
+            # continue
             # train_data
             optimizer.zero_grad()
             # trans GT to onehot
@@ -641,4 +667,10 @@ if __name__ == '__main__':
                        [epoch],  # X的第一个点的坐标
                        win='dice',  # 窗口的名称
                        update='append')  # 图像的标例
+        wind_l1.line([[l1_loss]],  # Y的第一个点的坐标
+                       [epoch],  # X的第一个点的坐标
+                       win='l1_loss',  # 窗口的名称
+                       update='append',
+                       opts=dict(title='l1_loss', legend=['l1_loss'])
+                       )
         time.sleep(0.5)

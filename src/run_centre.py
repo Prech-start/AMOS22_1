@@ -528,6 +528,7 @@ if __name__ == '__main__':
 
     wind_loss = Visdom(env=strategy)
     wind_dice = Visdom(env=strategy)
+    wind_l1 = Visdom(env=strategy)
 
     wind_dice.line([[0.]],  # Y的第一个点的坐标
                    [0.],  # X的第一个点的坐标
@@ -632,7 +633,13 @@ if __name__ == '__main__':
         # valid_loss.append(v_loss)
         # valid_acc.append(v_acc)
         # # 保存训练的loss
-        wind_loss.line([[dice_loss, ce_loss, (dice_loss + ce_loss) / 2, v_loss]],  # Y的第一个点的坐标
+        wind_loss.line([[l1_loss]],  # Y的第一个点的坐标
+                       [epoch],  # X的第一个点的坐标
+                       win='l1_loss',  # 窗口的名称
+                       update='append',
+                       opts=dict(title='l1_loss', legend=['l1_loss'])
+                       )
+        wind_l1.line([[dice_loss, ce_loss, (dice_loss + ce_loss) / 2, v_loss]],  # Y的第一个点的坐标
                        [epoch],  # X的第一个点的坐标
                        win='train&valid_loss',  # 窗口的名称
                        update='append',
