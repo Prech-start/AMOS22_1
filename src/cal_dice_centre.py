@@ -59,18 +59,18 @@ def GetEvaluation(SR: Tensor, GT: Tensor, EVALS: list = EVALUATIONS):
     return [acc, sensitivity, specificity, precision, f1, js, dice]
 
 
-from run_centre import get_test_data, UnetModel, get_train_data, get_compare_data
+
 
 
 def cal_dice_loss(model_path: str, dataloader):
     model = UnetModel(1, 16, 6)
     # model.cpu()
-    model.load_state_dict(torch.load(model_path, map_location='cuda:0'))
+    model.load_state_dict(torch.load(model_path, map_location='cpu'))
     # dc = DiceLoss(mode='multiclass')
     table = np.zeros((16, len(EVALUATIONS)))
     mask = np.ones((16, 1))
-    for ori, gt, _ in tqdm(dataloader):
-        pred,_ = model(ori.float())
+    for ori, gt, c_gt in tqdm(dataloader):
+        pred, c_out = model(ori.float())
         pred = torch.argmax(pred, 1).squeeze()
         for i in range(16):
             if i == 0:
@@ -89,12 +89,14 @@ def cal_dice_loss(model_path: str, dataloader):
     # print(evaluations)
     return evaluations
 
+from run_centre2 import get_test_data, UnetModel, get_train_data, get_compare_data
 
 if __name__ == '__main__':
     print('begin')
-    model_path = '/home/ljc/code/AMOS22/src/checkpoints/centre_final_02/Unet-final.pth'
+    model_path = '/home/ljc/code/AMOS22/src/checkpoints/centre_point/Unet-final.pth'
     cal_dice_loss(model_path=model_path, dataloader=get_test_data())
-    compare_evals = cal_dice_loss(model_path=model_path, dataloader=get_compare_data())
-    valid_evals = cal_dice_loss(model_path=model_path, dataloader=get_test_data())
-    compare_array = np.concatenate([compare_evals, valid_evals], axis=1)
+    # compare_evals = cal_dice_loss(model_path=model_path, dataloader=get_compare_data())
+    # valid_evals = cal_dice_loss(model_path=model_path, dataloader=get_test_data())
+    # compare_array = np.concatenate([compare_evals, valid_evals], axis=1)
+    valid_array = cal_dice_loss(model_path, get_test_data())
     print('finish')

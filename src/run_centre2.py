@@ -3,6 +3,7 @@ import torch.nn as nn
 import os
 import json
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.tensorboard import SummaryWriter
 import SimpleITK as sitk
 import numpy as np
 from skimage.transform import resize
@@ -24,8 +25,8 @@ import time
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
 # path_dir = r'../data/'
-# path_dir = r'/home/ljc/code/AMOS22/data/'
-path_dir = r'/nas/luojc/code/AMOS22/data'
+path_dir = r'/home/ljc/code/AMOS22/data/'
+# path_dir = r'/nas/luojc/code/AMOS22/data'
 task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
@@ -54,7 +55,7 @@ def cal_centre_point_5(label_arr: numpy.ndarray, label_file_path: str, r: int = 
     # save_path = os.path.join(file_path, '{}.npy'.format(file_name))
     target = np.ones([16, 3]) * -1
     # if not os.path.exists(save_path):
-        # centre_arr = np.zeros_like(label_arr).astype(np.float32)
+    # centre_arr = np.zeros_like(label_arr).astype(np.float32)
     for i in np.unique(label_arr).astype(int).tolist():
         if i == 0:
             continue
@@ -64,27 +65,27 @@ def cal_centre_point_5(label_arr: numpy.ndarray, label_file_path: str, r: int = 
         # 求中心点坐标
         x, y, z = np.mean(class_xyz, 1, dtype=int)
         target[i] = [x, y, z]
-            # # 求每个label点到中心的点的距离
-            # distance_for_xyz = np.linalg.norm(class_xyz.T - [x, y, z], axis=1)  # N * 1
-            # if i in small_organ:
-            #     r = 1 / 3 * np.max(distance_for_xyz)
-            # distance_for_xyz = np.linalg.norm(class_all.T - [x, y, z], axis=1)  # N * 1
-            # # 筛选出distance中距离小于r的所有坐标 type:tuple
-            # dis = np.where(distance_for_xyz < r)
-            # # 求出所有点坐标
-            # points = class_all.T[dis]
-            # labels = i * np.ones((1, 3))
-            # target = np.concatenate((target, labels), axis=0)
-            # target = np.concatenate((target, points), axis=0)
-            # # if i in small_organ:
-            # #     # 第i个通道的数据取出来做spacing
-            # #     array = centre_arr[i, ...]
-            # #     IMAGE = sitk.GetImageFromArray(array)
-            # #     IMAGE.SetSpacing(spacing)
-            # #     # 保存到桌面
-            # #     filename = 'test.nii.gz'
-            # #     sitk.WriteImage(IMAGE, filename)
-            # #     pass
+        # # 求每个label点到中心的点的距离
+        # distance_for_xyz = np.linalg.norm(class_xyz.T - [x, y, z], axis=1)  # N * 1
+        # if i in small_organ:
+        #     r = 1 / 3 * np.max(distance_for_xyz)
+        # distance_for_xyz = np.linalg.norm(class_all.T - [x, y, z], axis=1)  # N * 1
+        # # 筛选出distance中距离小于r的所有坐标 type:tuple
+        # dis = np.where(distance_for_xyz < r)
+        # # 求出所有点坐标
+        # points = class_all.T[dis]
+        # labels = i * np.ones((1, 3))
+        # target = np.concatenate((target, labels), axis=0)
+        # target = np.concatenate((target, points), axis=0)
+        # # if i in small_organ:
+        # #     # 第i个通道的数据取出来做spacing
+        # #     array = centre_arr[i, ...]
+        # #     IMAGE = sitk.GetImageFromArray(array)
+        # #     IMAGE.SetSpacing(spacing)
+        # #     # 保存到桌面
+        # #     filename = 'test.nii.gz'
+        # #     sitk.WriteImage(IMAGE, filename)
+        # #     pass
         # print(target)
         # if target.shape[0] != 62101:
         #     target = np.concatenate((target, -1 * np.ones((62101 - target.shape[0], 3))), axis=0)
@@ -146,7 +147,10 @@ def get_train_data(batch_size=1):
     return DataLoader(
         dataset=data,
         batch_size=batch_size,
-        shuffle=True
+        shuffle=True,
+        pin_memory=True,
+        num_workers=4,
+        prefetch_factor=True
     )
 
 
@@ -283,8 +287,13 @@ class DecoderBlock(nn.Module):
 class Down_a(nn.Module):
     def __init__(self, in_channel, out_channel):
         super(Down_a, self).__init__()
-        self.conv1 = nn.Conv3d(in_channels=in_channel, out_channels=in_channel * 2, kernel_size=2, stride=2)
-        self.conv2 = nn.Conv3d(in_channels=in_channel * 2, out_channels=in_channel * 2, kernel_size=4, stride=4)
+
+        self.conv1 = nn.Sequential(
+            nn.Conv3d(in_channels=in_channel, out_channels=in_channel * 2, kernel_size=2, stride=2),
+            ConvBlock(in_channels=in_channel * 2, out_channels=in_channel * 4))
+        self.conv2 = nn.Sequential(
+            nn.Conv3d(in_channels=in_channel * 4, out_channels=in_channel * 2, kernel_size=2, stride=2),
+            ConvBlock(in_channels=in_channel * 2, out_channels=in_channel * 2))
         self.conv3 = nn.Conv3d(in_channels=in_channel * 2, out_channels=in_channel, kernel_size=2, stride=2)
         self.pooling = nn.AdaptiveAvgPool3d(output_size=2)
         self.linear1 = nn.Linear(8, 6)
@@ -297,7 +306,7 @@ class Down_a(nn.Module):
         x = F.relu(self.conv3(x))
         x = F.relu(self.pooling(x))
         x = x.flatten().reshape(b, c, -1)
-        x = torch.sigmoid(self.linear1(x))
+        x = F.relu(self.linear1(x))
         x = self.linear2(x)
         return x
 
@@ -511,8 +520,8 @@ if __name__ == '__main__':
     n_epochs = 300
     batch_size = 1
     is_load = False
-    # device = torch.device('cpu')
-    device = torch.device('cuda:0')
+    device = torch.device('cpu')
+    # device = torch.device('cuda:0')
     strategy = 'centre_point'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
@@ -549,14 +558,15 @@ if __name__ == '__main__':
     if is_load:
         model.load_state_dict(torch.load(load_path))
 
-    wind_loss = Visdom(env=strategy)
-    wind_dice = Visdom(env=strategy)
-    wind_l1 = Visdom(env=strategy)
-    wind_dice.line([[0.]],  # Y的第一个点的坐标
-                   [0.],  # X的第一个点的坐标
-                   win='dice',  # 窗口的名称
-                   opts=dict(title='dice', legend=['dice'])  # 图像的标例
-                   )
+    # wind_loss = Visdom(env=strategy)
+    # wind_dice = Visdom(env=strategy)
+    # wind_l1 = Visdom(env=strategy)
+    # wind_dice.line([[0.]],  # Y的第一个点的坐标
+    #                [0.],  # X的第一个点的坐标
+    #                win='dice',  # 窗口的名称
+    #                opts=dict(title='dice', legend=['dice'])  # 图像的标例
+    #                )
+    writer = SummaryWriter()
 
     for epoch in range(1, n_epochs + 1):
         w_L1 = ((epoch - n_epochs) ** 2) / ((1 - n_epochs) ** 2)
@@ -656,21 +666,27 @@ if __name__ == '__main__':
         # valid_loss.append(v_loss)
         # valid_acc.append(v_acc)
         # # 保存训练的loss
-        wind_loss.line([[dice_loss, ce_loss, (dice_loss + ce_loss) / 2, v_loss]],  # Y的第一个点的坐标
-                       [epoch],  # X的第一个点的坐标
-                       win='train&valid_loss',  # 窗口的名称
-                       update='append',
-                       opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss'])
-                       )
-
-        wind_dice.line([[v_acc]],  # Y的第一个点的坐标
-                       [epoch],  # X的第一个点的坐标
-                       win='dice',  # 窗口的名称
-                       update='append')  # 图像的标例
-        wind_l1.line([[l1_loss]],  # Y的第一个点的坐标
-                       [epoch],  # X的第一个点的坐标
-                       win='l1_loss',  # 窗口的名称
-                       update='append',
-                       opts=dict(title='l1_loss', legend=['l1_loss'])
-                       )
-        time.sleep(0.5)
+        # wind_loss.line([[dice_loss, ce_loss, (dice_loss + ce_loss) / 2, v_loss]],  # Y的第一个点的坐标
+        #                [epoch],  # X的第一个点的坐标
+        #                win='train&valid_loss',  # 窗口的名称
+        #                update='append',
+        #                opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss'])
+        #                )
+        writer.add_scalars('loss_line', {'dice_loss': dice_loss,
+                                         'ce_loss': ce_loss,
+                                         'train_loss': (dice_loss + ce_loss) / 2,
+                                         'valid_loss': v_loss})
+        # wind_dice.line([[v_acc]],  # Y的第一个点的坐标
+        #                [epoch],  # X的第一个点的坐标
+        #                win='dice',  # 窗口的名称
+        #                update='append')  # 图像的标例
+        writer.add_scalar('dice', {'dice': v_acc})
+        # wind_l1.line([[l1_loss]],  # Y的第一个点的坐标
+        #              [epoch],  # X的第一个点的坐标
+        #              win='l1_loss',  # 窗口的名称
+        #              update='append',
+        #              opts=dict(title='l1_loss', legend=['l1_loss'])
+        #              )
+        writer.add_scalar('l1_loss', {'l1_loss': v_acc})
+        # time.sleep(0.5)
+    writer.close()
