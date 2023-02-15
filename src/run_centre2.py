@@ -25,8 +25,8 @@ import time
 # path_dir = os.path.dirname(__file__)
 # task2_json = json.load(open(os.path.join(path_dir, '..', 'data', 'AMOS22', 'task2_dataset.json')))
 # path_dir = r'../data/'
-path_dir = r'/home/ljc/code/AMOS22/data/'
-# path_dir = r'/nas/luojc/code/AMOS22/data'
+# path_dir = r'/home/ljc/code/AMOS22/data/'
+path_dir = r'/nas/luojc/code/AMOS22/data'
 task2_json = json.load(open(os.path.join(path_dir, 'AMOS22', 'dataset_cropped.json')))
 
 file_path = [[os.path.join(path_dir, 'AMOS22', path_['image']),
@@ -285,16 +285,15 @@ class DecoderBlock(nn.Module):
 
 
 class Down_a(nn.Module):
-    def __init__(self, in_channel, out_channel):
+    def __init__(self, in_channel):
         super(Down_a, self).__init__()
 
-        self.conv1 = nn.Sequential(
-            nn.Conv3d(in_channels=in_channel, out_channels=in_channel * 2, kernel_size=2, stride=2),
-            ConvBlock(in_channels=in_channel * 2, out_channels=in_channel * 4))
-        self.conv2 = nn.Sequential(
-            nn.Conv3d(in_channels=in_channel * 4, out_channels=in_channel * 2, kernel_size=2, stride=2),
-            ConvBlock(in_channels=in_channel * 2, out_channels=in_channel * 2))
-        self.conv3 = nn.Conv3d(in_channels=in_channel * 2, out_channels=in_channel, kernel_size=2, stride=2)
+        self.conv1 = nn.Conv3d(in_channels=in_channel, out_channels=in_channel * 2, kernel_size=3, stride=2, padding=1)
+        self.conv2 = nn.Conv3d(in_channels=in_channel * 2, out_channels=in_channel * 4, kernel_size=3, stride=2,
+                               padding=1)
+        self.conv3 = nn.Conv3d(in_channels=in_channel * 4, out_channels=in_channel * 2, kernel_size=3, stride=2,
+                               padding=1)
+        self.conv4 = nn.Conv3d(in_channels=in_channel * 2, out_channels=in_channel, kernel_size=3, stride=2, padding=1)
         self.pooling = nn.AdaptiveAvgPool3d(output_size=2)
         self.linear1 = nn.Linear(8, 6)
         self.linear2 = nn.Linear(6, 3)
@@ -304,6 +303,7 @@ class Down_a(nn.Module):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
+        x = F.relu(self.conv4(x))
         x = F.relu(self.pooling(x))
         x = x.flatten().reshape(b, c, -1)
         x = F.relu(self.linear1(x))
@@ -317,7 +317,7 @@ class UnetModel(nn.Module):
         super(UnetModel, self).__init__()
         self.encoder = EncoderBlock(in_channels=in_channels, model_depth=model_depth)
         self.decoder = DecoderBlock(out_channels=out_channels, model_depth=model_depth)
-        self.centre_head = Down_a(out_channels, out_channels)
+        self.centre_head = Down_a(out_channels)
         if final_activation == "sigmoid":
             self.sigmoid = nn.Sigmoid()
         else:
@@ -325,7 +325,7 @@ class UnetModel(nn.Module):
 
     def forward(self, x):
         x, downsampling_features = self.encoder(x)
-        seg_x = self.decoder(x, downsampling_features)
+        seg_x = self.decoder(x, downsampling_features) ###(bs, 16, w, h, d)
         # seg_x = self.sigmoid(seg_x)   ##bj
         # # print("Final output shape: ", x.shape)
         centre = self.centre_head(seg_x)
@@ -520,9 +520,9 @@ if __name__ == '__main__':
     n_epochs = 300
     batch_size = 1
     is_load = False
-    device = torch.device('cpu')
-    # device = torch.device('cuda:0')
-    strategy = 'centre_point'
+    # device = torch.device('cpu')
+    device = torch.device('cuda:0')
+    strategy = 'centre_point_3'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
     # path_dir = r'/media/bj/DataFolder3/datasets/challenge_AMOS22'
@@ -532,6 +532,7 @@ if __name__ == '__main__':
     # path = os.path.join(path_dir, 'checkpoints', strategy)
     model = UnetModel(1, 16, 6)
     loss_weight = [1, 1.02, 1.03, 1.03, 0.88, 0.87, 1.04, 0.91, 1.03, 1.01, 0.90, 0.91, 0.83, 0.85, 0.86, 0.86]
+    loss_weight = [1 for _ in range(16)]
     loss1 = ComboLoss_wbce_dice(loss_weight)
     loss2 = ComboLoss_wbce_ndice(loss_weight)
     # crit = loss2
@@ -541,10 +542,10 @@ if __name__ == '__main__':
     loss3_dice = DiceLoss(mode='multiclass', weight=loss_weight)  ##bj
     loss4_ce = SoftCrossEntropyLoss(smooth_factor=0.0, weight=loss_weight)  ##bj
 
-    loss5_L1 = torch.nn.SmoothL1Loss()
+    loss5_L1 = torch.nn.SmoothL1Loss(reduction='sum')
     w_dice = 1.0
     w_ce = 1.0
-    w_L1 = 0.1
+    w_L1 = 0.
     # choice loss function
     # crit = loss3_dice
     crit = loss4_ce
@@ -569,6 +570,10 @@ if __name__ == '__main__':
     writer = SummaryWriter()
 
     for epoch in range(1, n_epochs + 1):
+        # if epoch <= 100:
+        #     w_L1 = ((epoch - 100) ** 2) / ((1 - 100) ** 2)
+        # else:
+        #     w_L1 = 1e-3
         w_L1 = ((epoch - n_epochs) ** 2) / ((1 - n_epochs) ** 2)
         t_loss = []
         v_loss = []
@@ -578,9 +583,6 @@ if __name__ == '__main__':
         l1_loss = []
         model.train()
         model.to(device)
-        if epoch == 200:
-            learning_rate = 1e-4
-            optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for index, (data, GT, C_GT) in enumerate(train_loader):
             # save_path = os.path.join('output', 'AMOS_CENTRE', str(index))
             # for i in range(data.squeeze().shape[0]):
@@ -675,18 +677,18 @@ if __name__ == '__main__':
         writer.add_scalars('loss_line', {'dice_loss': dice_loss,
                                          'ce_loss': ce_loss,
                                          'train_loss': (dice_loss + ce_loss) / 2,
-                                         'valid_loss': v_loss})
+                                         'valid_loss': v_loss}, epoch)
         # wind_dice.line([[v_acc]],  # Y的第一个点的坐标
         #                [epoch],  # X的第一个点的坐标
         #                win='dice',  # 窗口的名称
         #                update='append')  # 图像的标例
-        writer.add_scalar('dice', {'dice': v_acc})
+        writer.add_scalar('dice', v_acc, epoch)
         # wind_l1.line([[l1_loss]],  # Y的第一个点的坐标
         #              [epoch],  # X的第一个点的坐标
         #              win='l1_loss',  # 窗口的名称
         #              update='append',
         #              opts=dict(title='l1_loss', legend=['l1_loss'])
         #              )
-        writer.add_scalar('l1_loss', {'l1_loss': v_acc})
+        writer.add_scalar('l1_loss', l1_loss, epoch)
         # time.sleep(0.5)
     writer.close()
