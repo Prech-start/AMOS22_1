@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import os
@@ -517,11 +518,11 @@ if __name__ == '__main__':
 
     class_num = 16
     learning_rate = 1e-3
-    n_epochs = 300
+    n_epochs = 900
     batch_size = 1
     is_load = False
     # device = torch.device('cpu')
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:3')
     strategy = 'centre_point_3'
     load_path = '/nas/luojc/code/AMOS22/src/checkpoints/new_combo_1e-3/Unet-final.pth'
     path_dir = os.path.dirname(__file__)
@@ -674,7 +675,7 @@ if __name__ == '__main__':
         #                update='append',
         #                opts=dict(title='train_loss', legend=['dice_loss', 'ce_loss', 'train_loss', 'valid_loss'])
         #                )
-        writer.add_scalars('loss_line', {'dice_loss': dice_loss,
+        writer.add_scalars('loss/loss_line', {'dice_loss': dice_loss,
                                          'ce_loss': ce_loss,
                                          'train_loss': (dice_loss + ce_loss) / 2,
                                          'valid_loss': v_loss}, epoch)
@@ -682,13 +683,13 @@ if __name__ == '__main__':
         #                [epoch],  # X的第一个点的坐标
         #                win='dice',  # 窗口的名称
         #                update='append')  # 图像的标例
-        writer.add_scalar('dice', v_acc, epoch)
+        writer.add_scalar('info/dice', v_acc, epoch)
         # wind_l1.line([[l1_loss]],  # Y的第一个点的坐标
         #              [epoch],  # X的第一个点的坐标
         #              win='l1_loss',  # 窗口的名称
         #              update='append',
         #              opts=dict(title='l1_loss', legend=['l1_loss'])
         #              )
-        writer.add_scalar('l1_loss', l1_loss, epoch)
+        writer.add_scalar('loss/l1_loss', l1_loss, epoch)
         # time.sleep(0.5)
     writer.close()

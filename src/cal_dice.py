@@ -59,11 +59,14 @@ def GetEvaluation(SR: Tensor, GT: Tensor, EVALS: list = EVALUATIONS):
     return [acc, sensitivity, specificity, precision, f1, js, dice]
 
 
-from run import get_test_data, UnetModel, get_train_data, get_compare_data
+
+
+
+from run_SSLnet import get_test_data, unet_3D as UnetModel, get_train_data,get_valid_data , get_compare_data
 
 
 def cal_dice_loss(model_path: str, dataloader):
-    model = UnetModel(1, 16, 6)
+    model = UnetModel(n_classes=16, in_channels=1)
     # model.cpu()
     model.load_state_dict(torch.load(model_path, map_location='cuda:0'))
     # dc = DiceLoss(mode='multiclass')
@@ -92,8 +95,8 @@ def cal_dice_loss(model_path: str, dataloader):
 
 if __name__ == '__main__':
     print('begin')
-    model_path = '/home/ljc/code/AMOS22/src/checkpoints/centre_final_02/Unet-final.pth'
-    cal_dice_loss(model_path=model_path, dataloader=get_test_data())
+    model_path = '/home/ljc/code/AMOS22/src/checkpoints/SSLnet/Unet-final.pth'
+    cal_dice_loss(model_path=model_path, dataloader=get_valid_data())
     compare_evals = cal_dice_loss(model_path=model_path, dataloader=get_compare_data())
     valid_evals = cal_dice_loss(model_path=model_path, dataloader=get_test_data())
     compare_array = np.concatenate([compare_evals, valid_evals], axis=1)
